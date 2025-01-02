@@ -2,12 +2,14 @@
 
 use egui_app_template::App;
 use egui_app_template::BackendEventLoop;
+use egui_app_template::CounterAppState;
 
 fn main() -> eframe::Result {
     // start backend loop
     let (command_tx, command_rx) = std::sync::mpsc::channel();
 
-    let _eventloop_handle = BackendEventLoop::new(command_rx).run();
+    let backend_state = CounterAppState::default();
+    let _eventloop_handle = BackendEventLoop::new(command_rx, backend_state).run();
 
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 

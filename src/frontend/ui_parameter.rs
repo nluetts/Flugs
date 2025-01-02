@@ -2,20 +2,20 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 
 use log::warn;
 
-pub(super) struct UIParameter<T> {
+pub struct UIParameter<T> {
     pending_update_rx: Option<Receiver<T>>,
     value: T,
 }
 
 impl<T: Clone> UIParameter<T> {
-    pub(super) fn new(val: T) -> Self {
+    pub fn new(val: T) -> Self {
         UIParameter {
             pending_update_rx: None,
             value: val,
         }
     }
 
-    pub(super) fn try_update(&mut self) {
+    pub fn try_update(&mut self) {
         if let Some(rx) = &self.pending_update_rx {
             match rx.try_recv() {
                 Ok(val) => {
@@ -33,15 +33,15 @@ impl<T: Clone> UIParameter<T> {
         }
     }
 
-    pub(super) fn is_up_to_date(&self) -> bool {
+    pub fn is_up_to_date(&self) -> bool {
         self.pending_update_rx.is_none()
     }
 
-    pub(super) fn set_recv(&mut self, rx: Receiver<T>) {
+    pub fn set_recv(&mut self, rx: Receiver<T>) {
         self.pending_update_rx = Some(rx);
     }
 
-    pub(super) fn value(&self) -> T {
+    pub fn value(&self) -> T {
         self.value.clone()
     }
 }

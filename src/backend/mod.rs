@@ -1,3 +1,3 @@
-//pub mod command;
 pub mod eventloop;
-//pub mod response;
+
+pub trait BackendState {}

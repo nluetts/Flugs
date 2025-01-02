@@ -3,14 +3,18 @@ use std::sync::mpsc::Receiver;
 use log::info;
 
 use crate::BackendRequest;
+use crate::BackendState;
 
-pub struct BackendEventLoop {
-    counter: i64,
-    request_rx: Receiver<Box<dyn BackendRequest>>,
+pub struct BackendEventLoop<S>
+where
+    S: BackendState,
+{
+    pub state: S,
+    request_rx: Receiver<Box<dyn BackendRequest<S>>>,
     should_stop: bool,
 }
 
-impl BackendEventLoop {
+impl<S: BackendState + Send + 'static> BackendEventLoop<S> {
     pub fn update(&mut self) -> bool {
         // handle the most important command
         while let Ok(request) = self.request_rx.try_recv() {
@@ -29,23 +33,12 @@ impl BackendEventLoop {
             }
         })
     }
-    pub fn new(command_rx: Receiver<Box<dyn BackendRequest>>) -> Self {
+    pub fn new(command_rx: Receiver<Box<dyn BackendRequest<S>>>, state: S) -> Self {
         info!("creating new event loop");
         Self {
-            counter: 0,
+            state,
             request_rx: command_rx,
             should_stop: false,
         }
-    }
-    pub fn increment_counter(&mut self) {
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        self.counter += 1;
-    }
-    pub fn decrement_counter(&mut self) {
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        self.counter -= 1;
-    }
-    pub fn counter_value(&self) -> i64 {
-        self.counter
     }
 }

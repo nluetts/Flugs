@@ -2,22 +2,22 @@ use std::sync::mpsc::Receiver;
 
 use log::info;
 
-use super::super::app::BackendRequest;
+use crate::BackendRequest;
 
 pub struct BackendEventLoop {
     counter: i64,
     request_rx: Receiver<Box<dyn BackendRequest>>,
-    stop: bool,
+    should_stop: bool,
 }
 
 impl BackendEventLoop {
     pub fn update(&mut self) -> bool {
         // handle the most important command
-        while let Some(request) = self.request_rx.try_recv().ok() {
-            info!("handeling request");
+        while let Ok(request) = self.request_rx.try_recv() {
+            info!("handeling request '{}'", request.describe());
             request.run_on_backend(self);
         }
-        return self.stop;
+        self.should_stop
     }
     pub fn run(mut self) -> std::thread::JoinHandle<()> {
         std::thread::spawn(move || loop {
@@ -34,14 +34,14 @@ impl BackendEventLoop {
         Self {
             counter: 0,
             request_rx: command_rx,
-            stop: false,
+            should_stop: false,
         }
     }
-    pub fn increase_counter(&mut self) {
+    pub fn increment_counter(&mut self) {
         std::thread::sleep(std::time::Duration::from_secs(1));
         self.counter += 1;
     }
-    pub fn decrease_counter(&mut self) {
+    pub fn decrement_counter(&mut self) {
         std::thread::sleep(std::time::Duration::from_secs(1));
         self.counter -= 1;
     }

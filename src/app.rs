@@ -1,7 +1,8 @@
 use log::warn;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
+use crate::BackendEventLoop;
+
 pub struct App {
     counter: UIParameter<i64>,
     request_tx: Sender<Box<dyn BackendRequest>>,
@@ -16,7 +17,7 @@ struct UIParameter<T> {
 /// once the action ran on the backend.
 struct Linker<T, F>
 where
-    F: Fn(&mut Backend) -> T,
+    F: Fn(&mut BackendEventLoop) -> T,
 {
     backchannel: Sender<T>,
     action: F,
@@ -24,7 +25,7 @@ where
 
 impl<T, F> Linker<T, F>
 where
-    F: Fn(&mut Backend) -> T,
+    F: Fn(&mut BackendEventLoop) -> T,
 {
     fn new(backchannel: Sender<T>, action: F) -> Self {
         Self {
@@ -34,32 +35,20 @@ where
     }
 }
 
-trait BackendRequest {
-    fn run_on_backend(self, backend: &mut Backend);
+pub trait BackendRequest: Send {
+    fn run_on_backend(&self, backend: &mut BackendEventLoop);
 }
 
 impl<T, F> BackendRequest for Linker<T, F>
 where
-    F: Fn(&mut Backend) -> T,
+    F: Fn(&mut BackendEventLoop) -> T + Send,
+    T: Send,
 {
-    fn run_on_backend(self, backend: &mut Backend) {
+    fn run_on_backend(&self, backend: &mut BackendEventLoop) {
         let result = (self.action)(backend);
         self.backchannel
             .send(result)
             .expect("The Backchannel is open to receive answers.")
-    }
-}
-
-pub struct Backend {
-    value: i64,
-}
-
-impl Backend {
-    fn increase_counter(&mut self) {
-        self.value += 1;
-    }
-    fn decrease_counter(&mut self) {
-        self.value -= 1;
     }
 }
 
@@ -75,7 +64,7 @@ impl<T> UIParameter<T> {
 impl App {
     /// Called once before the first frame.
     pub fn new(
-        cc: &eframe::CreationContext<'_>,
+        _cc: &eframe::CreationContext<'_>,
         request_tx: Sender<Box<dyn BackendRequest>>,
     ) -> Self {
         Self {
@@ -125,36 +114,34 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
-            ui.heading("overengineered counter");
+            ui.heading("Overengineered, Slow Counter");
 
             let ui_enabled = self.try_update_counter();
             let increment_button = egui::Button::new("Increment");
             let decrement_button = egui::Button::new("Decrement");
-            if ui.button("Increment").clicked() {
+            if ui.add_enabled(ui_enabled, increment_button).clicked() {
                 let (tx, rx) = std::sync::mpsc::channel();
                 self.counter.pending_update_rx = Some(rx);
                 let linker = Linker::new(tx, |b| {
                     b.increase_counter();
-                    b.value
+                    b.counter_value()
                 });
                 self.request_tx
                     .send(Box::new(linker))
                     .expect("Trying to send value via closed channel.");
             }
-            if ui.button("Decrement").clicked() {
+            ui.label(format!("counter {}", self.counter.value));
+            if ui.add_enabled(ui_enabled, decrement_button).clicked() {
                 let (tx, rx) = std::sync::mpsc::channel();
                 self.counter.pending_update_rx = Some(rx);
                 let linker = Linker::new(tx, |b| {
                     b.decrease_counter();
-                    b.value
+                    b.counter_value()
                 });
                 self.request_tx
                     .send(Box::new(linker))
                     .expect("Trying to send value via closed channel.");
             }
-            ui.add_enabled(ui_enabled, increment_button);
-            ui.label(format!("counter {}", self.counter.value));
-            ui.add_enabled(ui_enabled, decrement_button);
         });
     }
 }

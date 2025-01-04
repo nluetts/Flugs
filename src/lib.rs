@@ -4,9 +4,10 @@ mod backend;
 mod counter_app;
 mod frontend;
 
-pub use backend::{eventloop::BackendEventLoop, BackendState};
-pub use counter_app::{backend_state::CounterAppState, App};
-pub use frontend::{
+pub use backend::{
     backend_link::{BackendLink, BackendRequest},
-    ui_parameter::UIParameter,
+    eventloop::BackendEventLoop,
+    BackendState,
 };
+pub use counter_app::{backend_state::CounterAppState, App};
+pub use frontend::ui_parameter::UIParameter;

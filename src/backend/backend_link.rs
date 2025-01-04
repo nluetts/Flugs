@@ -1,4 +1,7 @@
-use std::{marker::PhantomData, sync::mpsc::Sender};
+use std::{
+    marker::PhantomData,
+    sync::mpsc::{channel, Receiver, Sender},
+};
 
 use crate::{BackendEventLoop, BackendState};
 
@@ -20,13 +23,17 @@ where
     F: Fn(&mut BackendEventLoop<S>) -> T,
     S: BackendState,
 {
-    pub fn new(backchannel: Sender<T>, description: String, action: F) -> Self {
-        Self {
-            backchannel,
-            action,
-            description,
-            _marker: PhantomData,
-        }
+    pub fn new(description: String, action: F) -> (Receiver<T>, Self) {
+        let (tx, rx) = channel();
+        (
+            rx,
+            Self {
+                backchannel: tx,
+                action,
+                description,
+                _marker: PhantomData,
+            },
+        )
     }
 }
 

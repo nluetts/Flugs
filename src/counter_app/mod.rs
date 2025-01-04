@@ -2,10 +2,7 @@ pub mod backend_state;
 use backend_state::CounterAppState;
 use log::{info, warn};
 
-use std::{
-    sync::mpsc::{channel, Sender},
-    thread::JoinHandle,
-};
+use std::{sync::mpsc::Sender, thread::JoinHandle};
 
 use crate::{BackendEventLoop, BackendLink, BackendRequest, UIParameter};
 
@@ -64,9 +61,7 @@ impl eframe::App for App {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        let (tx, rx) = channel();
-        let signal_end_linker = BackendLink::new(
-            tx,
+        let (rx, signal_end_linker) = BackendLink::new(
             "try end event loop".to_string(),
             |b: &mut BackendEventLoop<CounterAppState>| {
                 b.signal_stop();
@@ -91,32 +86,28 @@ impl eframe::App for App {
 /// Define UI events here
 impl App {
     fn request_increment(&mut self) {
-        let (tx, rx) = channel();
-        self.counter.set_recv(rx);
-        let linker = BackendLink::new(
-            tx,
+        let (rx, linker) = BackendLink::new(
             "increment counter".to_string(),
             |b: &mut BackendEventLoop<CounterAppState>| {
                 b.state.increment_counter();
                 b.state.counter_value()
             },
         );
+        self.counter.set_recv(rx);
         self.request_tx
             .send(Box::new(linker))
             .expect("Trying to send value via closed channel.");
     }
 
     fn request_decrement(&mut self) {
-        let (tx, rx) = channel();
-        self.counter.set_recv(rx);
-        let linker = BackendLink::new(
-            tx,
+        let (rx, linker) = BackendLink::new(
             "decrement counter".to_string(),
             |b: &mut BackendEventLoop<CounterAppState>| {
                 b.state.decrement_counter();
                 b.state.counter_value()
             },
         );
+        self.counter.set_recv(rx);
         self.request_tx
             .send(Box::new(linker))
             .expect("Trying to send value via closed channel.");

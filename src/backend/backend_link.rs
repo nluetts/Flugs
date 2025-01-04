@@ -1,4 +1,9 @@
-use std::{marker::PhantomData, sync::mpsc::Sender};
+use std::{
+    marker::PhantomData,
+    sync::mpsc::{channel, Receiver, Sender},
+};
+
+use log::warn;
 
 use crate::{BackendEventLoop, BackendState};
 
@@ -20,13 +25,17 @@ where
     F: Fn(&mut BackendEventLoop<S>) -> T,
     S: BackendState,
 {
-    pub fn new(backchannel: Sender<T>, description: String, action: F) -> Self {
-        Self {
-            backchannel,
-            action,
-            description,
-            _marker: PhantomData,
-        }
+    pub fn new(description: &str, action: F) -> (Receiver<T>, Self) {
+        let (tx, rx) = channel();
+        (
+            rx,
+            Self {
+                backchannel: tx,
+                action,
+                description: description.to_owned(),
+                _marker: PhantomData,
+            },
+        )
     }
 }
 
@@ -45,10 +54,15 @@ where
     T: Send,
 {
     fn run_on_backend(&self, backend: &mut BackendEventLoop<S>) {
+        // TODO: the action should only run if the listening side is still
+        // alive; consider implementing this with an atomic bool
         let result = (self.action)(backend);
-        self.backchannel
-            .send(result)
-            .expect("Trying to send message on closed channel.")
+        let _ = self.backchannel.send(result).map_err(|_| {
+            warn!(
+                "Trying to send message for request '{}' on closed channel.",
+                self.description
+            )
+        });
     }
     fn describe(&self) -> &str {
         &self.description

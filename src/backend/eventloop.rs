@@ -25,7 +25,6 @@ impl<S: BackendState + Send + 'static> BackendEventLoop<S> {
     }
     pub fn run(mut self) -> std::thread::JoinHandle<()> {
         std::thread::spawn(move || loop {
-            // info!("next backend event loop iteration");
             let stop_loop = self.update();
             if stop_loop {
                 info!("stopping backend event loop");

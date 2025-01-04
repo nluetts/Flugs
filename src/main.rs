@@ -1,8 +1,11 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
-use egui_app_template::App;
+use std::path::PathBuf;
+use std::str::FromStr;
+
+use egui_app_template::BackendAppState;
 use egui_app_template::BackendEventLoop;
-use egui_app_template::CounterAppState;
+use egui_app_template::EguiApp;
 
 const WINDOW_NAME: &str = "PlotMe CSV Plotter";
 const WINDOW_WIDTH: f32 = 400.0;
@@ -13,7 +16,10 @@ fn main() -> eframe::Result {
 
     // start backend loop
     let (command_tx, command_rx) = std::sync::mpsc::channel();
-    let backend_state = CounterAppState::default();
+    let backend_state = BackendAppState::new(
+        PathBuf::from_str("/home/nluetts/ownCloud/RAMAN-PC_LightField-Data/")
+            .expect("unable to open demo file path"),
+    );
     let eventloop_handle = BackendEventLoop::new(command_rx, backend_state).run();
 
     let native_options = eframe::NativeOptions {
@@ -25,6 +31,6 @@ fn main() -> eframe::Result {
     eframe::run_native(
         WINDOW_NAME,
         native_options,
-        Box::new(|cc| Ok(Box::new(App::new(cc, command_tx, eventloop_handle)))),
+        Box::new(|cc| Ok(Box::new(EguiApp::new(cc, command_tx, eventloop_handle)))),
     )
 }

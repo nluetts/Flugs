@@ -1,7 +1,7 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 mod backend;
-mod counter_app;
+mod csv_plotter_app;
 mod frontend;
 
 pub use backend::{
@@ -9,5 +9,5 @@ pub use backend::{
     eventloop::BackendEventLoop,
     BackendState,
 };
-pub use counter_app::{backend_state::CounterAppState, App};
+pub use csv_plotter_app::{backend_state::BackendAppState, EguiApp};
 pub use frontend::ui_parameter::UIParameter;

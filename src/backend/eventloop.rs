@@ -41,4 +41,8 @@ impl<S: BackendState + Send + 'static> BackendEventLoop<S> {
             should_stop: false,
         }
     }
+    pub fn signal_stop(&mut self) -> bool {
+        self.should_stop = true;
+        true
+    }
 }

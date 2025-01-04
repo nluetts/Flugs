@@ -1,23 +1,30 @@
 pub mod backend_state;
 use backend_state::CounterAppState;
+use log::{info, warn};
 
-use std::sync::mpsc::Sender;
+use std::{
+    sync::mpsc::{channel, Sender},
+    thread::JoinHandle,
+};
 
 use crate::{BackendEventLoop, BackendLink, BackendRequest, UIParameter};
 
 pub struct App {
     counter: UIParameter<i64>,
     request_tx: Sender<Box<dyn BackendRequest<CounterAppState>>>,
+    backend_thread_handle: Option<JoinHandle<()>>,
 }
 
 impl App {
     pub fn new(
         _cc: &eframe::CreationContext<'_>,
         request_tx: Sender<Box<dyn BackendRequest<CounterAppState>>>,
+        backend_thread_handle: JoinHandle<()>,
     ) -> Self {
         Self {
             counter: UIParameter::new(0),
             request_tx,
+            backend_thread_handle: Some(backend_thread_handle),
         }
     }
 }
@@ -55,20 +62,44 @@ impl eframe::App for App {
             })
         });
     }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        let (tx, rx) = channel();
+        let signal_end_linker = BackendLink::new(
+            tx,
+            "try end event loop".to_string(),
+            |b: &mut BackendEventLoop<CounterAppState>| {
+                b.signal_stop();
+                true
+            },
+        );
+        info!("sending signal to end backend event loop");
+        if self.request_tx.send(Box::new(signal_end_linker)).is_ok() {
+            if let Err(e) = rx.recv_timeout(std::time::Duration::from_secs(10)) {
+                warn!("did not receive a response after 10 seconds: {e}");
+            };
+        };
+        if let Some(handle) = self.backend_thread_handle.take() {
+            match handle.join() {
+                Ok(_) => info!("backend event loop ended"),
+                Err(e) => warn!("failed to signal event loop to stop: {e:?}"),
+            }
+        };
+    }
 }
 
 /// Define UI events here
 impl App {
     fn request_increment(&mut self) {
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (tx, rx) = channel();
         self.counter.set_recv(rx);
         let linker = BackendLink::new(
             tx,
+            "increment counter".to_string(),
             |b: &mut BackendEventLoop<CounterAppState>| {
                 b.state.increment_counter();
                 b.state.counter_value()
             },
-            "increment counter".to_string(),
         );
         self.request_tx
             .send(Box::new(linker))
@@ -76,15 +107,15 @@ impl App {
     }
 
     fn request_decrement(&mut self) {
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (tx, rx) = channel();
         self.counter.set_recv(rx);
         let linker = BackendLink::new(
             tx,
+            "decrement counter".to_string(),
             |b: &mut BackendEventLoop<CounterAppState>| {
                 b.state.decrement_counter();
                 b.state.counter_value()
             },
-            "decrement counter".to_string(),
         );
         self.request_tx
             .send(Box::new(linker))

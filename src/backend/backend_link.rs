@@ -20,7 +20,7 @@ where
     F: Fn(&mut BackendEventLoop<S>) -> T,
     S: BackendState,
 {
-    pub fn new(backchannel: Sender<T>, action: F, description: String) -> Self {
+    pub fn new(backchannel: Sender<T>, description: String, action: F) -> Self {
         Self {
             backchannel,
             action,

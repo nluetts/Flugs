@@ -1,9 +1,8 @@
+use log::warn;
 use std::{
     marker::PhantomData,
     sync::mpsc::{channel, Receiver, Sender},
 };
-
-use log::warn;
 
 use crate::{BackendEventLoop, BackendState};
 

@@ -1,9 +1,11 @@
-use std::sync::mpsc::{Receiver, TryRecvError};
+use std::sync::mpsc::TryRecvError;
 
 use log::warn;
 
+use crate::backend::backend_link::LinkReceiver;
+
 pub struct UIParameter<T> {
-    pending_update_rx: Option<Receiver<T>>,
+    pending_update_rx: Option<LinkReceiver<T>>,
     value: T,
 }
 
@@ -37,7 +39,7 @@ impl<T: Clone> UIParameter<T> {
         self.pending_update_rx.is_none()
     }
 
-    pub fn set_recv(&mut self, rx: Receiver<T>) {
+    pub fn set_recv(&mut self, rx: LinkReceiver<T>) {
         self.pending_update_rx = Some(rx);
     }
 

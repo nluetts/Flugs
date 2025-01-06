@@ -2,7 +2,7 @@ use std::sync::mpsc::TryRecvError;
 
 use log::warn;
 
-use crate::backend::backend_link::LinkReceiver;
+use crate::backend::LinkReceiver;
 
 pub struct UIParameter<T> {
     pending_update_rx: Option<LinkReceiver<T>>,

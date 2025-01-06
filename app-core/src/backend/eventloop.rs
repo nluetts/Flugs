@@ -2,8 +2,8 @@ use std::sync::mpsc::Receiver;
 
 use log::info;
 
-use crate::BackendRequest;
-use crate::BackendState;
+use crate::backend::BackendRequest;
+use crate::backend::BackendState;
 
 pub struct BackendEventLoop<S>
 where

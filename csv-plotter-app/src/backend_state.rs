@@ -1,7 +1,7 @@
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use std::path::PathBuf;
 
-use crate::BackendState;
+use app_core::backend::BackendState;
 
 #[derive(Default)]
 pub struct BackendAppState {

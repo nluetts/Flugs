@@ -3,9 +3,8 @@
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use egui_app_template::BackendAppState;
-use egui_app_template::BackendEventLoop;
-use egui_app_template::EguiApp;
+use app_core::backend::BackendEventLoop;
+use csv_plotter::{BackendAppState, EguiApp};
 
 const WINDOW_NAME: &str = "PlotMe CSV Plotter";
 const WINDOW_WIDTH: f32 = 400.0;

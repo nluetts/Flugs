@@ -8,7 +8,7 @@ use std::{
     },
 };
 
-use crate::{BackendEventLoop, BackendState};
+use crate::backend::{BackendEventLoop, BackendState};
 
 /// The linker is send to the backend thread and replies
 /// once the action ran on the backend.

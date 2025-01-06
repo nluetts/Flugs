@@ -1,10 +1,10 @@
-pub mod backend_state;
-use backend_state::BackendAppState;
+use crate::BackendAppState;
 use log::{info, warn};
 
 use std::{path::PathBuf, sync::mpsc::Sender, thread::JoinHandle};
 
-use crate::{BackendEventLoop, BackendLink, BackendRequest, UIParameter};
+use app_core::backend::{BackendEventLoop, BackendLink, BackendRequest};
+use app_core::frontend::UIParameter;
 
 pub struct EguiApp {
     read_current_child_paths: UIParameter<()>,

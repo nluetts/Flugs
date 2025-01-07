@@ -1,7 +1,11 @@
 use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
+use std::thread::JoinHandle;
 
 use log::info;
+use log::warn;
 
+use crate::backend::BackendLink;
 use crate::backend::BackendRequest;
 use crate::backend::BackendState;
 
@@ -43,5 +47,26 @@ impl<S: BackendState + Send + 'static> BackendEventLoop<S> {
     pub fn signal_stop(&mut self) -> bool {
         self.should_stop = true;
         true
+    }
+}
+
+pub fn request_stop<S: BackendState + Send + 'static>(
+    request_tx: &Sender<Box<dyn BackendRequest<S>>>,
+    backend_thread_handle: JoinHandle<()>,
+) {
+    let (rx, signal_end_linker) =
+        BackendLink::new("try end event loop", |b: &mut BackendEventLoop<S>| {
+            b.signal_stop();
+            true
+        });
+    info!("sending signal to end backend event loop");
+    if request_tx.send(Box::new(signal_end_linker)).is_ok() {
+        if let Err(e) = rx.recv_timeout(std::time::Duration::from_secs(10)) {
+            warn!("did not receive a response after 10 seconds: {e}");
+        };
+    };
+    match backend_thread_handle.join() {
+        Ok(_) => info!("backend event loop ended"),
+        Err(e) => warn!("failed to signal event loop to stop: {e:?}"),
     }
 }

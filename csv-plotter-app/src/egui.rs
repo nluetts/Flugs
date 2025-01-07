@@ -1,5 +1,4 @@
 use crate::BackendAppState;
-use log::{info, warn};
 
 use std::{path::PathBuf, sync::mpsc::Sender, thread::JoinHandle};
 
@@ -78,25 +77,9 @@ impl eframe::App for EguiApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        let (rx, signal_end_linker) = BackendLink::new(
-            "try end event loop",
-            |b: &mut BackendEventLoop<BackendAppState>| {
-                b.signal_stop();
-                true
-            },
-        );
-        info!("sending signal to end backend event loop");
-        if self.request_tx.send(Box::new(signal_end_linker)).is_ok() {
-            if let Err(e) = rx.recv_timeout(std::time::Duration::from_secs(10)) {
-                warn!("did not receive a response after 10 seconds: {e}");
-            };
-        };
         if let Some(handle) = self.backend_thread_handle.take() {
-            match handle.join() {
-                Ok(_) => info!("backend event loop ended"),
-                Err(e) => warn!("failed to signal event loop to stop: {e:?}"),
-            }
-        };
+            app_core::backend::request_stop(&self.request_tx, handle);
+        }
     }
 }
 

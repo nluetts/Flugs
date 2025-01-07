@@ -16,10 +16,9 @@ mod tests {
     impl BackendState for TestState {}
 
     #[test]
-    fn test_cancel_request() {
+    fn test_cancel_request_working() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        // start backend loop
         let (request_tx, request_rx) = std::sync::mpsc::channel();
         let backend_state = TestState {};
         let eventloop_handle = BackendEventLoop::new(request_rx, backend_state).run();
@@ -31,7 +30,7 @@ mod tests {
         });
 
         // dropping rx should make the request invalid, such that the backend
-        // action (waiting for 50 ms) is not executed ...
+        // action (waiting for 1 s) is not executed ...
         drop(rx);
         trace!("drop of receiver done");
         assert!(linker.is_cancelled());

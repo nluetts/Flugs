@@ -1,4 +1,4 @@
-use log::{info, warn};
+use log::{trace, warn};
 use std::{
     marker::PhantomData,
     sync::{
@@ -35,6 +35,7 @@ where
         let rx = LinkReceiver {
             rx,
             is_cancelled: is_cancelled.clone(),
+            description: description.to_owned(),
         };
         (
             rx,
@@ -42,10 +43,14 @@ where
                 backchannel: tx,
                 action,
                 description: description.to_owned(),
-                is_cancelled: Arc::new(AtomicBool::new(false)),
+                is_cancelled,
                 _marker: PhantomData,
             },
         )
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.is_cancelled.load(SeqCst)
     }
 }
 
@@ -89,6 +94,7 @@ where
 pub struct LinkReceiver<T> {
     rx: Receiver<T>,
     is_cancelled: Arc<AtomicBool>,
+    description: String,
 }
 
 impl<T> LinkReceiver<T> {
@@ -102,7 +108,7 @@ impl<T> LinkReceiver<T> {
 
 impl<T> Drop for LinkReceiver<T> {
     fn drop(&mut self) {
-        info!("dropping link receiver");
+        trace!("dropping link receiver for request '{}'", self.description);
         self.is_cancelled.store(true, SeqCst);
     }
 }

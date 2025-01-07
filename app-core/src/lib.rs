@@ -36,7 +36,8 @@ mod tests {
         assert!(linker.is_cancelled());
         request_tx.send(Box::new(linker)).unwrap();
         // (this joins the thread handle of the event loop, making it block
-        // for as long as the backend action takes, i.e. at least 50 ms)
+        // for as long as the backend action takes, i.e. at least 1 s if
+        // the backend action is executed and not correctly cancelled)
         request_stop(&request_tx, eventloop_handle);
         let delta_time = (Instant::now() - tic).as_millis();
         // ... thus this whole process here should take much less than 50 ms

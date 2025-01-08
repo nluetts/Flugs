@@ -119,6 +119,6 @@ impl EguiApp {
         self.matched_paths.set_recv(rx);
         self.request_tx
             .send(Box::new(linker))
-            .expect("backend thread hung up");
+            .expect("backend thread hung up unexpectedly");
     }
 }

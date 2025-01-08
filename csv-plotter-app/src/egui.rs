@@ -52,7 +52,19 @@ impl eframe::App for EguiApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
-            ui.heading("Overengineered `fuzzy` Command");
+            let mut header = egui::text::LayoutJob::default();
+            let red = egui::TextFormat {
+                color: egui::Color32::RED,
+                ..Default::default()
+            };
+            let def = egui::TextFormat {
+                color: egui::Color32::BLUE,
+                ..Default::default()
+            };
+            header.append("Overengineered ", 0.0, def.clone());
+            header.append("Fuzzy ", 0.0, red);
+            header.append("Search", 0.0, def);
+            ui.label(header);
 
             let read_current_ui_enabled = self.read_current_child_paths.is_up_to_date();
             ui.add_enabled_ui(read_current_ui_enabled, |ui| {

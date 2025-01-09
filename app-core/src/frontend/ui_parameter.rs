@@ -43,7 +43,7 @@ impl<T: Clone> UIParameter<T> {
         self.pending_update_rx = Some(rx);
     }
 
-    pub fn value(&self) -> T {
-        self.value.clone()
+    pub fn value(&self) -> &T {
+        &self.value
     }
 }

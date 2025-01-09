@@ -4,10 +4,11 @@ use std::{path::PathBuf, sync::mpsc::Sender, thread::JoinHandle};
 
 use app_core::backend::{BackendEventLoop, BackendLink, BackendRequest};
 use app_core::frontend::UIParameter;
+use egui::text::LayoutJob;
 
 pub struct EguiApp {
     read_current_child_paths: UIParameter<()>,
-    matched_paths: UIParameter<Vec<PathBuf>>,
+    matched_paths: UIParameter<Vec<(PathBuf, Vec<usize>)>>,
     search_query: String,
     request_tx: Sender<Box<dyn BackendRequest<BackendAppState>>>,
     backend_thread_handle: Option<JoinHandle<()>>,
@@ -66,25 +67,7 @@ impl eframe::App for EguiApp {
             header.append("Search", 0.0, def);
             ui.label(header);
 
-            let read_current_ui_enabled = self.read_current_child_paths.is_up_to_date();
-            ui.add_enabled_ui(read_current_ui_enabled, |ui| {
-                if ui.button("Read Child Paths").clicked() {
-                    self.request_current_child_paths();
-                }
-            });
-            if ui.text_edit_singleline(&mut self.search_query).changed() {
-                self.query_current_path();
-            };
-            let paths_ui_enabled = self.matched_paths.is_up_to_date();
-            ui.add_enabled_ui(paths_ui_enabled, |ui| {
-                egui::ScrollArea::vertical()
-                    .max_height(250.0)
-                    .show(ui, |ui| {
-                        for fp in self.matched_paths.value() {
-                            ui.label(fp.to_string_lossy());
-                        }
-                    });
-            });
+            self.fuzzy_search_ui(ui);
         });
     }
 
@@ -95,13 +78,66 @@ impl eframe::App for EguiApp {
     }
 }
 
+/// Define UI components here
+
+impl EguiApp {
+    fn fuzzy_search_ui(&mut self, ui: &mut egui::Ui) {
+        use crate::backend_state::get_matched_unmatch_str_index_groups;
+        use egui::{Color32, FontId};
+
+        let read_current_ui_enabled = self.read_current_child_paths.is_up_to_date();
+        ui.add_enabled_ui(read_current_ui_enabled, |ui| {
+            if ui.button("Read Child Paths").clicked() {
+                self.request_current_child_paths();
+            }
+        });
+        if ui.text_edit_singleline(&mut self.search_query).changed() {
+            self.query_current_path();
+        };
+        let paths_ui_enabled = self.matched_paths.is_up_to_date();
+        ui.add_enabled_ui(paths_ui_enabled, |ui| {
+            egui::ScrollArea::vertical()
+                .max_height(250.0)
+                .show(ui, |ui| {
+                    for (fp, indices) in self.matched_paths.value() {
+                        let fp_str = fp.to_string_lossy();
+                        let (mut matched, mut unmatched) =
+                            get_matched_unmatch_str_index_groups(&fp_str, indices);
+                        dbg!(&matched, &unmatched);
+                        let style_red = egui::TextFormat::simple(FontId::default(), Color32::RED);
+                        let style_white =
+                            egui::TextFormat::simple(FontId::default(), Color32::WHITE);
+                        let (mut last_style, mut style, mut last_ranges, mut ranges) =
+                            if *matched.first().unwrap().start() == 0 {
+                                (&style_red, &style_white, &mut matched, &mut unmatched)
+                            } else {
+                                (&style_white, &style_red, &mut unmatched, &mut matched)
+                            };
+
+                        let mut text_layout = LayoutJob::default();
+                        loop {
+                            if let Some(idxs) = ranges.pop() {
+                                text_layout.append(&fp_str[idxs], 0.0, style.to_owned());
+                                (last_style, style) = (style, last_style);
+                                (last_ranges, ranges) = (ranges, last_ranges);
+                            } else {
+                                break;
+                            }
+                        }
+                        ui.label(text_layout);
+                    }
+                });
+        });
+    }
+}
+
 /// Define UI events here
 impl EguiApp {
     fn request_current_child_paths(&mut self) {
         let (rx, linker) = BackendLink::new(
             "request child paths",
             |b: &mut BackendEventLoop<BackendAppState>| {
-                b.state.update_current_path_children();
+                b.state.update_child_paths_unfiltered();
             },
         );
         self.read_current_child_paths.set_recv(rx);

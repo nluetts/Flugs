@@ -1,7 +1,11 @@
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+mod fuzzy_search;
+
+use fuzzy_matcher::skim::SkimMatcherV2;
 use std::path::PathBuf;
 
 use app_core::backend::BackendState;
+
+pub use fuzzy_search::get_matched_unmatch_str_index_groups;
 
 #[derive(Default)]
 pub struct BackendAppState {
@@ -25,7 +29,7 @@ impl BackendAppState {
 
 /// Implementations of backend actions
 impl BackendAppState {
-    pub fn update_current_path_children(&mut self) {
+    pub fn update_child_paths_unfiltered(&mut self) {
         let mut file_paths = Vec::new();
         let mut dirs = vec![self.current_path.to_path_buf()];
 
@@ -45,20 +49,5 @@ impl BackendAppState {
         }
 
         self.child_paths_unfiltered = file_paths;
-    }
-
-    pub fn fuzzy_filter(&self, query: &str) -> Vec<PathBuf> {
-        let mut res: Vec<_> = self
-            .child_paths_unfiltered
-            .iter()
-            .filter_map(|fp| fp.to_str().map(|str| (fp, str)))
-            .filter_map(|(fp, str)| self.fzm.fuzzy_match(str, query).map(|score| (fp, score)))
-            .collect();
-        res.sort_unstable_by(|(_, score_a), (_, score_b)| score_a.cmp(score_b));
-        res.into_iter()
-            .rev() // to make highest score come on top
-            .filter_map(|(fp, score)| if score > 0 { Some(fp.to_owned()) } else { None })
-            .take(10)
-            .collect()
     }
 }

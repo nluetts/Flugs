@@ -1,6 +1,6 @@
 mod fuzzy_search;
 
-use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::clangd::ClangdMatcher;
 use std::path::PathBuf;
 
 use app_core::backend::BackendState;
@@ -11,14 +11,14 @@ pub use fuzzy_search::get_matched_unmatch_str_index_groups;
 pub struct BackendAppState {
     current_path: PathBuf,
     child_paths_unfiltered: Vec<PathBuf>,
-    fzm: SkimMatcherV2,
+    fzm: ClangdMatcher,
 }
 
 impl BackendState for BackendAppState {}
 
 impl BackendAppState {
     pub fn new(current_path: PathBuf) -> Self {
-        let fzm = SkimMatcherV2::default().smart_case();
+        let fzm = ClangdMatcher::default().smart_case();
         Self {
             current_path,
             child_paths_unfiltered: Vec::new(),

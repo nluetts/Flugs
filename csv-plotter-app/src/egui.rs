@@ -36,7 +36,7 @@ impl EguiApp {
 
 impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.request_repaint_after_secs(0.1);
+        // ctx.request_repaint_after_secs(0.1);
         self.update_parameters();
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
@@ -95,38 +95,44 @@ impl EguiApp {
             self.query_current_path();
         };
         let paths_ui_enabled = self.matched_paths.is_up_to_date();
+
+        let scroll_area = |ui: &mut egui::Ui| {
+            for (fp, indices) in self.matched_paths.value() {
+                if indices.is_empty() {
+                    break;
+                }
+                let fp_str = fp.to_string_lossy();
+                let (mut matched, mut unmatched) =
+                    get_matched_unmatch_str_index_groups(&fp_str, indices);
+                matched.reverse();
+                unmatched.reverse();
+                let style_red = egui::TextFormat::simple(FontId::default(), Color32::RED);
+                let style_white = egui::TextFormat::simple(FontId::default(), Color32::WHITE);
+                let (mut last_style, mut style, mut last_ranges, mut ranges) =
+                    if *matched.first().unwrap().start() == 0 {
+                        (&style_white, &style_red, &mut unmatched, &mut matched)
+                    } else {
+                        (&style_red, &style_white, &mut matched, &mut unmatched)
+                    };
+
+                let mut text_layout = LayoutJob::default();
+                loop {
+                    if let Some(idxs) = ranges.pop() {
+                        text_layout.append(&fp_str[idxs], 0.0, style.to_owned());
+                        (last_style, style) = (style, last_style);
+                        (last_ranges, ranges) = (ranges, last_ranges);
+                    } else {
+                        break;
+                    }
+                }
+                ui.label(text_layout);
+            }
+        };
+
         ui.add_enabled_ui(paths_ui_enabled, |ui| {
             egui::ScrollArea::vertical()
                 .max_height(250.0)
-                .show(ui, |ui| {
-                    for (fp, indices) in self.matched_paths.value() {
-                        let fp_str = fp.to_string_lossy();
-                        let (mut matched, mut unmatched) =
-                            get_matched_unmatch_str_index_groups(&fp_str, indices);
-                        dbg!(&matched, &unmatched);
-                        let style_red = egui::TextFormat::simple(FontId::default(), Color32::RED);
-                        let style_white =
-                            egui::TextFormat::simple(FontId::default(), Color32::WHITE);
-                        let (mut last_style, mut style, mut last_ranges, mut ranges) =
-                            if *matched.first().unwrap().start() == 0 {
-                                (&style_red, &style_white, &mut matched, &mut unmatched)
-                            } else {
-                                (&style_white, &style_red, &mut unmatched, &mut matched)
-                            };
-
-                        let mut text_layout = LayoutJob::default();
-                        loop {
-                            if let Some(idxs) = ranges.pop() {
-                                text_layout.append(&fp_str[idxs], 0.0, style.to_owned());
-                                (last_style, style) = (style, last_style);
-                                (last_ranges, ranges) = (ranges, last_ranges);
-                            } else {
-                                break;
-                            }
-                        }
-                        ui.label(text_layout);
-                    }
-                });
+                .show(ui, scroll_area);
         });
     }
 }

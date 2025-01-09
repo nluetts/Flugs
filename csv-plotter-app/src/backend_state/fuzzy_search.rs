@@ -19,13 +19,7 @@ impl BackendAppState {
             .collect();
         res.sort_unstable_by(|(_, score_a, _), (_, score_b, _)| score_b.cmp(score_a));
         res.into_iter()
-            .filter_map(|(fp, score, indices)| {
-                if score > 0 {
-                    Some((fp.to_owned(), indices))
-                } else {
-                    None
-                }
-            })
+            .map(|(fp, _score, indices)| (fp.to_owned(), indices))
             .take(10)
             .collect()
     }

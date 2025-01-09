@@ -1,26 +1,35 @@
 use crate::BackendAppState;
 
-use fuzzy_matcher::FuzzyMatcher;
-use std::ops::RangeInclusive;
+use std::{ops::RangeInclusive, path::PathBuf};
 
 impl BackendAppState {
     /// Return the best file path matches for `query`, together with the
     /// corresponding matching indices in the file path.
-    pub fn fuzzy_filter(&self, query: &str) -> Vec<(std::path::PathBuf, Vec<usize>)> {
-        let mut res: Vec<_> = self
-            .child_paths_unfiltered
+    pub fn search_filter(&self, query: &str) -> Vec<(PathBuf, Vec<usize>)> {
+        let contains_query = |filename: &&PathBuf| {
+            let fp = filename.to_str();
+            if fp.is_none() {
+                return false;
+            }
+            let fp = fp.unwrap();
+            query.split(" ").all(|q| fp.contains(q))
+        };
+        let query_indices = |filename: &PathBuf| {
+            let mut indices = Vec::new();
+            let fp = filename.to_str()?;
+            for q in query.split(" ") {
+                let idx = fp.find(q)?;
+                indices.extend(idx..idx + q.len());
+            }
+            indices.sort_unstable();
+            Some((filename.to_owned(), indices))
+        };
+
+        self.child_paths_unfiltered
             .iter()
-            .filter_map(|fp| fp.to_str().map(|str| (fp, str)))
-            .filter_map(|(fp, str)| {
-                self.fzm
-                    .fuzzy_indices(str, query)
-                    .map(|(score, indices)| (fp, score, indices))
-            })
-            .collect();
-        res.sort_unstable_by(|(_, score_a, _), (_, score_b, _)| score_b.cmp(score_a));
-        res.into_iter()
-            .map(|(fp, _score, indices)| (fp.to_owned(), indices))
+            .filter(contains_query)
             .take(10)
+            .filter_map(query_indices)
             .collect()
     }
 }
@@ -29,10 +38,10 @@ impl BackendAppState {
 /// of matched/not matched indices (for formatting).
 pub fn get_matched_unmatch_str_index_groups(
     s: &str,
-    indices: &Vec<usize>,
+    indices: &[usize],
 ) -> (Vec<RangeInclusive<usize>>, Vec<RangeInclusive<usize>>) {
     let not_matched: Vec<RangeInclusive<usize>> = {
-        let ins = (0..s.len()).filter(|n| !indices.contains(n)).collect();
+        let ins: Vec<_> = (0..s.len()).filter(|n| !indices.contains(n)).collect();
         group_indices(&ins)
     };
     let matched = group_indices(indices);
@@ -41,7 +50,7 @@ pub fn get_matched_unmatch_str_index_groups(
 
 /// Group neighboring indices into inclusive ranges. Assumes the provided
 /// indices are sorted.
-fn group_indices(indices: &Vec<usize>) -> Vec<RangeInclusive<usize>> {
+fn group_indices(indices: &[usize]) -> Vec<RangeInclusive<usize>> {
     if indices.is_empty() {
         return Vec::new();
     }
@@ -56,7 +65,7 @@ fn group_indices(indices: &Vec<usize>) -> Vec<RangeInclusive<usize>> {
             output
         }
     };
-    indices.into_iter().skip(1).fold(init, fold_fun)
+    indices.iter().skip(1).fold(init, fold_fun)
 }
 #[cfg(test)]
 mod test {

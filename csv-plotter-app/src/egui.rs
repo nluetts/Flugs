@@ -79,7 +79,6 @@ impl eframe::App for EguiApp {
 }
 
 /// Define UI components here
-
 impl EguiApp {
     fn fuzzy_search_ui(&mut self, ui: &mut egui::Ui) {
         use crate::backend_state::get_matched_unmatch_str_index_groups;
@@ -116,14 +115,10 @@ impl EguiApp {
                     };
 
                 let mut text_layout = LayoutJob::default();
-                loop {
-                    if let Some(idxs) = ranges.pop() {
-                        text_layout.append(&fp_str[idxs], 0.0, style.to_owned());
-                        (last_style, style) = (style, last_style);
-                        (last_ranges, ranges) = (ranges, last_ranges);
-                    } else {
-                        break;
-                    }
+                while let Some(idxs) = ranges.pop() {
+                    text_layout.append(&fp_str[idxs], 0.0, style.to_owned());
+                    (last_style, style) = (style, last_style);
+                    (last_ranges, ranges) = (ranges, last_ranges);
                 }
                 ui.label(text_layout);
             }
@@ -156,7 +151,7 @@ impl EguiApp {
         let query = self.search_query.to_owned();
         let (rx, linker) = BackendLink::new(
             "fuzzy match child paths",
-            move |b: &mut BackendEventLoop<BackendAppState>| b.state.fuzzy_filter(&query),
+            move |b: &mut BackendEventLoop<BackendAppState>| b.state.search_filter(&query),
         );
         self.matched_paths.set_recv(rx);
         self.request_tx

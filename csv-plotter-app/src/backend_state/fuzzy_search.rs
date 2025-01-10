@@ -22,6 +22,7 @@ impl BackendAppState {
                 indices.extend(idx..idx + q.len());
             }
             indices.sort_unstable();
+            indices.dedup();
             Some((filename.to_owned(), indices))
         };
 

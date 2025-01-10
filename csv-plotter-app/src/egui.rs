@@ -101,25 +101,39 @@ impl EguiApp {
                     break;
                 }
                 let fp_str = fp.to_string_lossy();
-                let (mut matched, mut unmatched) =
-                    get_matched_unmatch_str_index_groups(&fp_str, indices);
-                matched.reverse();
-                unmatched.reverse();
-                let style_red = egui::TextFormat::simple(FontId::default(), Color32::RED);
-                let style_white = egui::TextFormat::simple(FontId::default(), Color32::WHITE);
-                let (mut last_style, mut style, mut last_ranges, mut ranges) =
-                    if *matched.first().unwrap().start() == 0 {
-                        (&style_white, &style_red, &mut unmatched, &mut matched)
-                    } else {
-                        (&style_red, &style_white, &mut matched, &mut unmatched)
-                    };
+                let (matched, unmatched) = get_matched_unmatch_str_index_groups(&fp_str, indices);
+                let style_red = [egui::TextFormat::simple(FontId::default(), Color32::RED)];
+                let style_white = [egui::TextFormat::simple(FontId::default(), Color32::WHITE)];
 
-                let mut text_layout = LayoutJob::default();
-                while let Some(idxs) = ranges.pop() {
-                    text_layout.append(&fp_str[idxs], 0.0, style.to_owned());
-                    (last_style, style) = (style, last_style);
-                    (last_ranges, ranges) = (ranges, last_ranges);
-                }
+                // TODO: The way this works now, with ranges sorted into two
+                // vectors (matched, unmatched) and the whole dance below
+                // with aligning the ranges with the correct format
+                // is really tedious. A more imperative approach, just
+                // going through matched indices, may be more efficient
+                // in the end.
+
+                // collect string index ranges together with appropriate formatting
+                let mut fragments: Vec<_> = matched
+                    .into_iter()
+                    .zip(style_red.iter().map(|s| s.to_owned()).cycle())
+                    .chain(
+                        unmatched
+                            .into_iter()
+                            .zip(style_white.iter().map(|s| s.to_owned()).cycle()),
+                    )
+                    .collect();
+
+                fragments.sort_unstable_by(|(range_a, _), (range_b, _)| {
+                    range_a.start().cmp(range_b.start())
+                });
+
+                let text_layout =
+                    fragments
+                        .into_iter()
+                        .fold(LayoutJob::default(), |mut acc, (range, format)| {
+                            acc.append(&fp_str[range], 1.0, format);
+                            acc
+                        });
                 ui.label(text_layout);
             }
         };

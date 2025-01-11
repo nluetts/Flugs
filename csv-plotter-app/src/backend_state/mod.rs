@@ -4,8 +4,6 @@ use std::path::PathBuf;
 
 use app_core::backend::BackendState;
 
-pub use fuzzy_search::get_matched_unmatch_str_index_groups;
-
 #[derive(Default)]
 pub struct BackendAppState {
     current_path: PathBuf,

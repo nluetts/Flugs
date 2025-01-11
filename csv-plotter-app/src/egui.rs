@@ -1,5 +1,6 @@
 use crate::BackendAppState;
 
+use std::collections::HashSet;
 use std::{path::PathBuf, sync::mpsc::Sender, thread::JoinHandle};
 
 use app_core::backend::{BackendEventLoop, BackendLink, BackendRequest};
@@ -8,7 +9,7 @@ use egui::text::LayoutJob;
 
 pub struct EguiApp {
     read_current_child_paths: UIParameter<()>,
-    matched_paths: UIParameter<Vec<(PathBuf, Vec<usize>)>>,
+    matched_paths: UIParameter<Vec<(PathBuf, HashSet<usize>)>>,
     search_query: String,
     request_tx: Sender<Box<dyn BackendRequest<BackendAppState>>>,
     backend_thread_handle: Option<JoinHandle<()>>,
@@ -81,7 +82,6 @@ impl eframe::App for EguiApp {
 /// Define UI components here
 impl EguiApp {
     fn fuzzy_search_ui(&mut self, ui: &mut egui::Ui) {
-        use crate::backend_state::get_matched_unmatch_str_index_groups;
         use egui::{Color32, FontId};
 
         let read_current_ui_enabled = self.read_current_child_paths.is_up_to_date();
@@ -96,45 +96,43 @@ impl EguiApp {
         let paths_ui_enabled = self.matched_paths.is_up_to_date();
 
         let scroll_area = |ui: &mut egui::Ui| {
+            let style_red = egui::TextFormat::simple(FontId::default(), Color32::RED);
+            let style_white = egui::TextFormat::simple(FontId::default(), Color32::WHITE);
             for (fp, indices) in self.matched_paths.value() {
                 if indices.is_empty() {
                     break;
                 }
                 let fp_str = fp.to_string_lossy();
-                let (matched, unmatched) = get_matched_unmatch_str_index_groups(&fp_str, indices);
-                let style_red = [egui::TextFormat::simple(FontId::default(), Color32::RED)];
-                let style_white = [egui::TextFormat::simple(FontId::default(), Color32::WHITE)];
+                let fp_len = fp_str.len();
+                let mut prev_ismatch = indices.contains(&0);
+                let (mut start, mut end) = (0, 0);
+                let mut text = LayoutJob::default();
+                for i in 1..fp_len {
+                    let ismatch = indices.contains(&i);
+                    if prev_ismatch == ismatch {
+                        end = i;
+                    } else {
+                        let format = if prev_ismatch {
+                            style_red.to_owned()
+                        } else {
+                            style_white.to_owned()
+                        };
+                        text.append(&fp_str[start..=end], 2.0, format);
+                        (start, end) = (i, i);
+                        prev_ismatch = ismatch;
+                    }
 
-                // TODO: The way this works now, with ranges sorted into two
-                // vectors (matched, unmatched) and the whole dance below
-                // with aligning the ranges with the correct format
-                // is really tedious. A more imperative approach, just
-                // going through matched indices, may be more efficient
-                // in the end.
+                    if i == fp_len - 1 {
+                        let format = if ismatch {
+                            style_red.to_owned()
+                        } else {
+                            style_white.to_owned()
+                        };
+                        text.append(&fp_str[start..=i], 2.0, format);
+                    }
+                }
 
-                // collect string index ranges together with appropriate formatting
-                let mut fragments: Vec<_> = matched
-                    .into_iter()
-                    .zip(style_red.iter().map(|s| s.to_owned()).cycle())
-                    .chain(
-                        unmatched
-                            .into_iter()
-                            .zip(style_white.iter().map(|s| s.to_owned()).cycle()),
-                    )
-                    .collect();
-
-                fragments.sort_unstable_by(|(range_a, _), (range_b, _)| {
-                    range_a.start().cmp(range_b.start())
-                });
-
-                let text_layout =
-                    fragments
-                        .into_iter()
-                        .fold(LayoutJob::default(), |mut acc, (range, format)| {
-                            acc.append(&fp_str[range], 1.0, format);
-                            acc
-                        });
-                ui.label(text_layout);
+                ui.label(text);
             }
         };
 

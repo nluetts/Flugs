@@ -9,6 +9,12 @@ pub struct UIParameter<T> {
     value: T,
 }
 
+impl<T: Default + Clone> Default for UIParameter<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
 impl<T: Clone> UIParameter<T> {
     pub fn new(val: T) -> Self {
         UIParameter {

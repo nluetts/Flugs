@@ -3,6 +3,8 @@
 pub mod backend;
 pub mod frontend;
 
+pub const BACKEND_HUNG_UP_MSG: &str = "backend thread hung up unexpectedly";
+
 #[cfg(test)]
 mod tests {
     use std::time::Instant;

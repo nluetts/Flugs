@@ -1,17 +1,20 @@
 mod components;
 
-use crate::frontend_state::{FileHandler, Search};
+use self::components::Search;
+use crate::file_handling::FileHandler;
 use crate::BackendAppState;
 
 use std::{sync::mpsc::Sender, thread::JoinHandle};
 
 use app_core::backend::BackendRequest;
 
+pub type DynRequestSender = Sender<Box<dyn BackendRequest<BackendAppState>>>;
+
 pub struct EguiApp {
     backend_thread_handle: Option<JoinHandle<()>>,
-    file_handler: FileHandler,
+    _file_handler: FileHandler,
     search: Search,
-    request_tx: Sender<Box<dyn BackendRequest<BackendAppState>>>,
+    request_tx: DynRequestSender,
 }
 
 impl EguiApp {
@@ -22,7 +25,7 @@ impl EguiApp {
     ) -> Self {
         Self {
             backend_thread_handle: Some(backend_thread_handle),
-            file_handler: Default::default(),
+            _file_handler: Default::default(),
             search: Default::default(),
             request_tx,
         }

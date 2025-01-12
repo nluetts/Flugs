@@ -6,7 +6,7 @@ use app_core::backend::BackendState;
 pub struct BackendAppState {
     current_path: PathBuf,
     child_paths_unfiltered: Vec<PathBuf>,
-    id_counter: usize,
+    _id_counter: usize,
 }
 
 impl BackendState for BackendAppState {}
@@ -16,7 +16,7 @@ impl BackendAppState {
         Self {
             current_path,
             child_paths_unfiltered: Vec::new(),
-            id_counter: 0,
+            _id_counter: 0,
         }
     }
 }

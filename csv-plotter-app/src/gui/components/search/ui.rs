@@ -1,16 +1,7 @@
-use std::sync::mpsc::Sender;
+use crate::gui::DynRequestSender;
 
-use app_core::backend::{BackendEventLoop, BackendLink, BackendRequest};
-use egui::{text::LayoutJob, Ui};
-
-use crate::{frontend_state::Search, BackendAppState, EguiApp};
-
-impl Search {
-    pub fn render(
-        &mut self,
-        request_tx: &mut Sender<Box<dyn BackendRequest<BackendAppState>>>,
-        ui: &mut Ui,
-    ) {
+impl super::Search {
+    pub fn render(&mut self, request_tx: &mut DynRequestSender, ui: &mut egui::Ui) {
         // The central panel the region left after adding TopPanel's and SidePanel's
         let mut header = egui::text::LayoutJob::default();
         let red = egui::TextFormat {
@@ -29,31 +20,24 @@ impl Search {
         self.fuzzy_search_ui(request_tx, ui);
     }
 
-    fn fuzzy_search_ui(
-        &mut self,
-        request_tx: &mut Sender<Box<dyn BackendRequest<BackendAppState>>>,
-        ui: &mut egui::Ui,
-    ) {
+    fn fuzzy_search_ui(&mut self, request_tx: &mut DynRequestSender, ui: &mut egui::Ui) {
         use egui::{Color32, FontId};
 
-        let read_current_ui_enabled = self.read_current_child_paths_is_up_to_date();
+        let read_current_ui_enabled = self.read_current_child_paths.is_up_to_date();
         ui.add_enabled_ui(read_current_ui_enabled, |ui| {
             if ui.button("Read Child Paths").clicked() {
                 self.request_current_child_paths(request_tx);
             }
         });
-        if ui
-            .text_edit_singleline(self.search_query_mut_ref())
-            .changed()
-        {
+        if ui.text_edit_singleline(&mut self.search_query).changed() {
             self.query_current_path(request_tx);
         };
-        let paths_ui_enabled = self.matched_paths_is_up_to_date();
+        let paths_ui_enabled = self.matched_paths.is_up_to_date();
 
         let scroll_area = |ui: &mut egui::Ui| {
             let style_red = egui::TextFormat::simple(FontId::default(), Color32::RED);
-            let style_white = egui::TextFormat::simple(FontId::default(), Color32::WHITE);
-            for (fp, indices) in self.matched_paths_value() {
+            let style_white = egui::TextFormat::default();
+            for (fp, indices) in self.matched_paths.value() {
                 if indices.is_empty() {
                     break;
                 }
@@ -61,7 +45,7 @@ impl Search {
                 let fp_len = fp_str.len();
                 let mut prev_ismatch = indices.contains(&0);
                 let (mut start, mut end) = (0, 0);
-                let mut text = LayoutJob::default();
+                let mut text = egui::text::LayoutJob::default();
                 for i in 1..fp_len {
                     let ismatch = indices.contains(&i);
                     if prev_ismatch == ismatch {
@@ -96,36 +80,5 @@ impl Search {
                 .max_height(250.0)
                 .show(ui, scroll_area);
         });
-    }
-
-    fn request_current_child_paths(
-        &mut self,
-        request_tx: &mut Sender<Box<dyn BackendRequest<BackendAppState>>>,
-    ) {
-        let (rx, linker) = BackendLink::new(
-            "request child paths",
-            |b: &mut BackendEventLoop<BackendAppState>| {
-                b.state.update_child_paths_unfiltered();
-            },
-        );
-        self.set_recv_read_current_child_paths(rx);
-        request_tx
-            .send(Box::new(linker))
-            .expect("backend thread hung up");
-    }
-
-    fn query_current_path(
-        &mut self,
-        request_tx: &mut Sender<Box<dyn BackendRequest<BackendAppState>>>,
-    ) {
-        let query = self.search_query_mut_ref().to_owned();
-        let (rx, linker) = BackendLink::new(
-            "fuzzy match child paths",
-            move |b: &mut BackendEventLoop<BackendAppState>| b.state.search_filter(&query),
-        );
-        self.set_recv_matched_paths(rx);
-        request_tx
-            .send(Box::new(linker))
-            .expect("backend thread hung up unexpectedly");
     }
 }

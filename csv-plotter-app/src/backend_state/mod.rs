@@ -78,4 +78,8 @@ impl BackendAppState {
             .filter_map(query_indices)
             .collect()
     }
+
+    pub fn load_file(&self, path: &PathBuf) -> PathBuf {
+        path.to_owned()
+    }
 }

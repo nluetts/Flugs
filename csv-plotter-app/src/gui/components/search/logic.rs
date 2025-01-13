@@ -1,7 +1,10 @@
+use std::{path::PathBuf, time::Duration};
+
 use app_core::{
     backend::{BackendEventLoop, BackendLink},
     BACKEND_HUNG_UP_MSG,
 };
+use log::info;
 
 use crate::{gui::DynRequestSender, BackendAppState};
 
@@ -34,5 +37,18 @@ impl super::Search {
         request_tx
             .send(Box::new(linker))
             .expect(BACKEND_HUNG_UP_MSG);
+    }
+    pub(super) fn request_load_file(&self, fp: &PathBuf, request_tx: &mut DynRequestSender) {
+        let fp = fp.to_owned();
+        let (rx, linker) = BackendLink::new(
+            "load {fp}",
+            move |b: &mut BackendEventLoop<BackendAppState>| b.state.load_file(&fp),
+        );
+        request_tx
+            .send(Box::new(linker))
+            .expect(BACKEND_HUNG_UP_MSG);
+        if let Ok(path) = rx.recv_timeout(Duration::from_secs(1)) {
+            info!("received {:?}", path);
+        }
     }
 }

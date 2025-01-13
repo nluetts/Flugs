@@ -11,3 +11,4 @@ pub struct Search {
     read_current_child_paths: UIParameter<()>,
     search_query: String,
 }
+impl Search {}

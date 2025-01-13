@@ -40,6 +40,7 @@ impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // ctx.request_repaint_after_secs(0.1);
         self.update_state();
+        // ctx.show_viewport_deferred(1.into(), egui::ViewportBuilder::default(), |ui| ui.lab);
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
@@ -54,7 +55,7 @@ impl eframe::App for EguiApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            self.search.render(&mut self.request_tx, ui);
+            self.search.render(&mut self.request_tx, ui, ctx);
         });
     }
 

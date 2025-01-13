@@ -1,6 +1,8 @@
 #![allow(unused)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
+
+pub type FileID = usize;
 
 #[derive(Default)]
 pub struct FileHandler {
@@ -8,9 +10,9 @@ pub struct FileHandler {
     registry: HashMap<FileID, File>,
 }
 
-type FileID = usize;
-
-struct File {}
+struct File {
+    path: PathBuf,
+}
 
 struct Group {
     file_ids: Vec<FileID>,

@@ -2,6 +2,8 @@ use std::{collections::HashSet, path::PathBuf};
 
 use app_core::backend::BackendState;
 
+use crate::file_handling::GroupID;
+
 #[derive(Default)]
 pub struct BackendAppState {
     current_path: PathBuf,
@@ -52,7 +54,7 @@ impl BackendAppState {
     ///
     /// For a file path to match, the file path must contain all words
     /// (separated by white space).
-    pub fn search_filter(&self, query: &str) -> Vec<(PathBuf, HashSet<usize>)> {
+    pub fn search_filter(&self, query: &str) -> Vec<(PathBuf, HashSet<usize>, Option<GroupID>)> {
         let contains_query = |filename: &&PathBuf| {
             let fp = filename.to_str();
             if fp.is_none() {
@@ -68,7 +70,7 @@ impl BackendAppState {
                 let idx = fp.find(q)?;
                 indices.extend(idx..idx + q.len());
             }
-            Some((filename.to_owned(), indices))
+            Some((filename.to_owned(), indices, None))
         };
 
         self.child_paths_unfiltered

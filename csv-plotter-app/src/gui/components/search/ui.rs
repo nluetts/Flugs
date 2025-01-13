@@ -1,4 +1,6 @@
-use crate::gui::DynRequestSender;
+use egui::TextFormat;
+
+use crate::{file_handling::GroupID, gui::DynRequestSender};
 
 impl super::Search {
     pub fn render(
@@ -9,11 +11,11 @@ impl super::Search {
     ) {
         // The central panel the region left after adding TopPanel's and SidePanel's
         let mut header = egui::text::LayoutJob::default();
-        let red = egui::TextFormat {
+        let red = TextFormat {
             color: egui::Color32::RED,
             ..Default::default()
         };
-        let def = egui::TextFormat {
+        let def = TextFormat {
             color: egui::Color32::BLUE,
             ..Default::default()
         };
@@ -46,9 +48,11 @@ impl super::Search {
         let paths_ui_enabled = self.matched_paths.is_up_to_date();
 
         let scroll_area = |ui: &mut egui::Ui| {
-            let style_red = egui::TextFormat::simple(FontId::default(), Color32::RED);
-            let style_white = egui::TextFormat::default();
-            for (fp, indices) in self.matched_paths.value() {
+            let style_red = TextFormat::simple(FontId::default(), Color32::RED);
+            let style_white = TextFormat::default();
+            // TODO: this vec must also hold the group ID?
+            let mut to_load = Vec::new();
+            for (fp, indices, group_id) in self.matched_paths.value() {
                 if indices.is_empty() {
                     break;
                 }
@@ -82,22 +86,47 @@ impl super::Search {
                     }
                 }
 
-                if ui.label(text).interact(egui::Sense::hover()).hovered() {
+                let path_label = ui.label(text);
+                if let Some(grp) = group_id {
+                    let p = ui.painter_at(path_label.rect);
+                    p.add(egui::Shape::rect_filled(
+                        path_label.rect,
+                        0.1,
+                        Color32::DARK_RED.linear_multiply(0.1),
+                    ));
+                    let text = format!("{}", grp.id());
+                    ui.put(path_label.rect, egui::Label::new(&text));
+                }
+                if path_label.hovered() {
                     // if we hover a file path, we loose focus on search phrase
                     // input so we do not put in the following keyboard events
                     // as search phrase
                     phrase_input.surrender_focus();
                     if ctx.input(|i| i.key_released(egui::Key::Num1)) {
-                        self.request_load_file(fp, request_tx);
+                        if let Some(gid) = group_id {
+                            if gid.id() == 1 {
+                                // TODO: This should clear the selection
+                                *group_id = None;
+                            }
+                        } else {
+                            group_id.replace(GroupID::new(1));
+                            to_load.push(fp.to_owned());
+                        }
                     }
                 }
             }
+            to_load
         };
 
-        ui.add_enabled_ui(paths_ui_enabled, |ui| {
+        let response = ui.add_enabled_ui(paths_ui_enabled, |ui| {
             egui::ScrollArea::vertical()
                 .max_height(250.0)
-                .show(ui, scroll_area);
+                .show(ui, scroll_area)
         });
+        let to_load = response.inner.inner;
+        for fp in to_load.into_iter() {
+            let rx = self.request_load_file(&fp, request_tx);
+            self._requested_loading.push(rx);
+        }
     }
 }

@@ -17,3 +17,16 @@ struct File {
 struct Group {
     file_ids: Vec<FileID>,
 }
+
+#[derive(Clone)]
+pub struct GroupID(usize);
+
+impl GroupID {
+    pub fn new(id: usize) -> Self {
+        GroupID(id)
+    }
+
+    pub fn id(&self) -> usize {
+        self.0
+    }
+}

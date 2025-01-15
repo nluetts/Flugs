@@ -1,6 +1,6 @@
 use std::{collections::HashSet, path::PathBuf};
 
-use egui::{text::LayoutJob, Color32, FontId, InputState, TextFormat};
+use egui::{text::LayoutJob, Color32, FontId, InputState, Label, Pos2, TextFormat};
 
 use crate::{file_handling::GroupID, gui::DynRequestSender};
 
@@ -13,20 +13,33 @@ impl super::Search {
     ) -> Option<HashSet<PathBuf>> {
         ui.heading("Overengineered Fuzzy Finder");
 
+        let mut popup_opened_this_frame = false;
         // sense if search shortcut was pressed
         if ctx.input(|i| i.modifiers.command && i.key_released(egui::Key::Space)) {
             self.popup_shown = !self.popup_shown;
+            if self.popup_shown {
+                popup_opened_this_frame = true;
+            }
         }
 
         if !self.popup_shown {
             return None;
         }
 
-        // what should be loaded is returned from the function
+        // this will be returned from the function
         let mut files_to_load = HashSet::new();
 
-        // modal response creates an "overlay" on top of the UI
-        let modal = egui::Modal::new("search_popup".into());
+        let screen_width = ctx.screen_rect().width();
+        let screen_height = ctx.screen_rect().height();
+        let search_text_width = 800.0;
+
+        // prepare search popup
+        let draw_area = egui::Area::new("modal_area".into()).current_pos(Pos2::from((
+            (screen_width - search_text_width) * 0.5,
+            screen_height * 0.2,
+        )));
+
+        let modal = egui::Modal::new("search_popup".into()).area(draw_area);
 
         let modal_ui = |ui: &mut egui::Ui| {
             let read_current_ui_enabled = self.read_current_child_paths.is_up_to_date();
@@ -37,7 +50,12 @@ impl super::Search {
                 }
             });
 
-            let phrase_input = ui.text_edit_singleline(&mut self.search_query);
+            let phrase_input = ui.add(
+                egui::TextEdit::singleline(&mut self.search_query).desired_width(search_text_width),
+            );
+            if popup_opened_this_frame {
+                phrase_input.request_focus()
+            };
             if phrase_input.changed() {
                 self.query_current_path(request_tx);
             };
@@ -45,12 +63,7 @@ impl super::Search {
             let paths_ui_enabled = self.matched_paths.is_up_to_date();
 
             ui.add_enabled_ui(paths_ui_enabled, |ui| {
-                egui::ScrollArea::vertical()
-                    .max_height(250.0)
-                    .max_width(800.0)
-                    .show(ui, |ui: &mut egui::Ui| {
-                        self.handle_matches(ui, phrase_input, &mut files_to_load, ctx);
-                    })
+                self.matches_ui(ui, phrase_input, &mut files_to_load, ctx);
             });
         };
 
@@ -68,44 +81,57 @@ impl super::Search {
         Some(files_to_load)
     }
 
-    fn handle_matches(
+    fn matches_ui(
         &mut self,
         ui: &mut egui::Ui,
         phrase_input: egui::Response,
         files_to_load: &mut HashSet<PathBuf>,
         ctx: &egui::Context,
     ) {
-        for (fp, indices, group_id) in self.matched_paths.value() {
-            if indices.is_empty() {
-                break;
-            }
+        let width = 800.0;
+        let height = 600.0;
 
-            ui.horizontal(|ui| {
-                let path_label = ui.label(render_match_label(fp, indices));
-                if path_label.hovered() {
-                    // if we hover a file path, we loose focus on search phrase
-                    // input so we do not put in the following keyboard events
-                    // as search phrase
-                    phrase_input.surrender_focus();
-                    if let Some(released_num) = ctx.input(number_key_released) {
-                        // TODO: I bet there is an easier way:
-                        if let Some(gid) = group_id.take() {
-                            if released_num != gid.id() {
+        let scroll_area = |ui: &mut egui::Ui| {
+            for (fp, indices, group_id) in self.matched_paths.value() {
+                if indices.is_empty() {
+                    break;
+                }
+
+                ui.horizontal(|ui| {
+                    let path_label = Label::new(render_match_label(fp, indices)).wrap();
+                    if ui.add(path_label).hovered() {
+                        // if we hover a file path, we loose focus on search phrase
+                        // input so we do not put in the following keyboard events
+                        // as search phrase; however, if we just opened the search
+                        // popup and do not move the mouse we keep the focus
+                        if ctx.input(|i| i.pointer.is_moving()) {
+                            phrase_input.surrender_focus()
+                        };
+                        if let Some(released_num) = ctx.input(number_key_released) {
+                            // TODO: I bet there is an easier way:
+                            if let Some(gid) = group_id.take() {
+                                if released_num != gid.id() {
+                                    group_id.replace(GroupID::new(released_num));
+                                    files_to_load.insert(fp.to_owned());
+                                }
+                            } else {
                                 group_id.replace(GroupID::new(released_num));
                                 files_to_load.insert(fp.to_owned());
                             }
-                        } else {
-                            group_id.replace(GroupID::new(released_num));
-                            files_to_load.insert(fp.to_owned());
                         }
                     }
-                }
-                if let Some(grp) = group_id {
-                    let text = format!("{}", grp.id());
-                    ui.label(&text);
-                }
-            });
-        }
+                    if let Some(grp) = group_id {
+                        let text = format!("{}", grp.id());
+                        ui.label(&text);
+                    }
+                });
+            }
+        };
+        egui::ScrollArea::vertical()
+            .min_scrolled_height(height)
+            .max_width(width)
+            .max_height(height)
+            .show(ui, scroll_area);
     }
 }
 

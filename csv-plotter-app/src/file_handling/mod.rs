@@ -18,7 +18,7 @@ struct Group {
     file_ids: Vec<FileID>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GroupID(usize);
 
 impl GroupID {

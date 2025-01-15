@@ -38,7 +38,7 @@ impl super::Search {
             .expect(BACKEND_HUNG_UP_MSG);
     }
 
-    pub(super) fn request_load_file(
+    pub(super) fn _request_load_file(
         &self,
         fp: &PathBuf,
         request_tx: &mut DynRequestSender,

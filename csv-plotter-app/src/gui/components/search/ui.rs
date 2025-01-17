@@ -11,11 +11,9 @@ impl super::Search {
     pub fn render(
         &mut self,
         request_tx: &mut DynRequestSender,
-        ui: &mut egui::Ui,
+        _ui: &mut egui::Ui,
         ctx: &egui::Context,
     ) -> HashSet<(PathBuf, GroupID)> {
-        ui.heading("Overengineered Fuzzy Finder");
-
         let mut popup_opened_this_frame = false;
         // sense if search shortcut was pressed
         if ctx.input(|i| i.modifiers.command && i.key_released(egui::Key::Space)) {
@@ -53,7 +51,7 @@ impl super::Search {
             let phrase_input = ui.add(
                 egui::TextEdit::singleline(&mut self.search_query).desired_width(search_text_width),
             );
-            if popup_opened_this_frame {
+            if popup_opened_this_frame || phrase_input.hovered() {
                 phrase_input.request_focus()
             };
             if phrase_input.changed() {
@@ -100,6 +98,7 @@ impl super::Search {
 
                 ui.horizontal(|ui| {
                     let path_label = Label::new(render_match_label(fp, indices)).wrap();
+
                     if ui.add(path_label).hovered() {
                         // if we hover a file path, we loose focus on search phrase
                         // input so we do not put in the following keyboard events
@@ -108,20 +107,28 @@ impl super::Search {
                         if ctx.input(|i| i.pointer.is_moving()) {
                             phrase_input.surrender_focus()
                         };
-                        if let Some(released_num) = ctx.input(number_key_released) {
-                            // TODO: I bet there is an easier way:
-                            if let Some(gid) = group_id.take() {
-                                if released_num != gid.id() {
+
+                        let (input_active, numkey_released) =
+                            (phrase_input.has_focus(), ctx.input(number_key_released));
+                        match (input_active, numkey_released) {
+                            (_, None) => (),
+                            (true, Some(_)) => (),
+                            (false, Some(released_num)) => {
+                                // TODO: I bet there is an easier way:
+                                if let Some(gid) = group_id.take() {
+                                    if released_num != gid.id() {
+                                        group_id.replace(GroupID::new(released_num));
+                                    }
+                                } else {
                                     group_id.replace(GroupID::new(released_num));
                                 }
-                            } else {
-                                group_id.replace(GroupID::new(released_num));
                             }
                         }
                     }
                     if let Some(grp) = group_id {
-                        let text = format!("{}", grp.id());
-                        ui.label(&text);
+                        let text = format!("({})", grp.id());
+                        let text = LayoutJob::simple(text, FontId::default(), Color32::RED, 5.0);
+                        ui.add(Label::new(text));
                     }
                 });
             }

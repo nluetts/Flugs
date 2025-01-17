@@ -1,4 +1,7 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use egui::{text::LayoutJob, Color32, FontId, InputState, Label, Pos2, TextFormat};
 
@@ -10,7 +13,7 @@ impl super::Search {
         request_tx: &mut DynRequestSender,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
-    ) -> Option<HashSet<PathBuf>> {
+    ) -> HashSet<(PathBuf, GroupID)> {
         ui.heading("Overengineered Fuzzy Finder");
 
         let mut popup_opened_this_frame = false;
@@ -23,11 +26,8 @@ impl super::Search {
         }
 
         if !self.popup_shown {
-            return None;
+            return HashSet::new();
         }
-
-        // this will be returned from the function
-        let mut files_to_load = HashSet::new();
 
         let screen_width = ctx.screen_rect().width();
         let screen_height = ctx.screen_rect().height();
@@ -63,7 +63,7 @@ impl super::Search {
             let paths_ui_enabled = self.matched_paths.is_up_to_date();
 
             ui.add_enabled_ui(paths_ui_enabled, |ui| {
-                self.matches_ui(ui, phrase_input, &mut files_to_load, ctx);
+                self.matches_ui(ui, phrase_input, ctx);
             });
         };
 
@@ -75,19 +75,20 @@ impl super::Search {
 
         if ctx.input(|i| i.key_released(egui::Key::Enter)) {
             self.popup_shown = false;
-            log::info!("accepted files to load");
+            let to_load: HashSet<(PathBuf, GroupID)> = self
+                .matched_paths
+                .value()
+                .drain(..)
+                .filter_map(|(path, _, group_id)| group_id.map(|gid| (path, gid)))
+                .collect();
+            self.search_query.clear();
+            log::info!("returning {} paths to load", to_load.len());
+            return to_load;
         };
-
-        Some(files_to_load)
+        HashSet::new()
     }
 
-    fn matches_ui(
-        &mut self,
-        ui: &mut egui::Ui,
-        phrase_input: egui::Response,
-        files_to_load: &mut HashSet<PathBuf>,
-        ctx: &egui::Context,
-    ) {
+    fn matches_ui(&mut self, ui: &mut egui::Ui, phrase_input: egui::Response, ctx: &egui::Context) {
         let width = 800.0;
         let height = 600.0;
 
@@ -112,11 +113,9 @@ impl super::Search {
                             if let Some(gid) = group_id.take() {
                                 if released_num != gid.id() {
                                     group_id.replace(GroupID::new(released_num));
-                                    files_to_load.insert(fp.to_owned());
                                 }
                             } else {
                                 group_id.replace(GroupID::new(released_num));
-                                files_to_load.insert(fp.to_owned());
                             }
                         }
                     }
@@ -135,7 +134,7 @@ impl super::Search {
     }
 }
 
-fn render_match_label(fp: &mut PathBuf, indices: &mut HashSet<usize>) -> LayoutJob {
+fn render_match_label(fp: &mut Path, indices: &mut HashSet<usize>) -> LayoutJob {
     let style_red = TextFormat::simple(FontId::default(), Color32::RED);
     let style_white = TextFormat::default();
 

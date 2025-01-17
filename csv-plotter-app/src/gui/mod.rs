@@ -12,7 +12,7 @@ pub type DynRequestSender = Sender<Box<dyn BackendRequest<BackendAppState>>>;
 
 pub struct EguiApp {
     backend_thread_handle: Option<JoinHandle<()>>,
-    _file_handler: FileHandler,
+    file_handler: FileHandler,
     search: Search,
     request_tx: DynRequestSender,
 }
@@ -25,7 +25,7 @@ impl EguiApp {
     ) -> Self {
         Self {
             backend_thread_handle: Some(backend_thread_handle),
-            _file_handler: Default::default(),
+            file_handler: Default::default(),
             search: Default::default(),
             request_tx,
         }
@@ -55,7 +55,11 @@ impl eframe::App for EguiApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            self.search.render(&mut self.request_tx, ui, ctx);
+            let search_results = self.search.render(&mut self.request_tx, ui, ctx);
+            if !search_results.is_empty() {
+                self.file_handler.handle_search_results(search_results);
+                log::info!("file handler updated: {:?}", self.file_handler);
+            }
         });
     }
 

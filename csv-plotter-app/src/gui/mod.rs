@@ -1,6 +1,6 @@
 mod components;
 
-use self::components::Search;
+use self::components::{Plotter, Search};
 use crate::file_handling::FileHandler;
 use crate::BackendAppState;
 
@@ -13,8 +13,9 @@ pub type DynRequestSender = Sender<Box<dyn BackendRequest<BackendAppState>>>;
 pub struct EguiApp {
     backend_thread_handle: Option<JoinHandle<()>>,
     file_handler: FileHandler,
-    search: Search,
+    plotter: Plotter,
     request_tx: DynRequestSender,
+    search: Search,
     ui_selection: UISelection,
 }
 
@@ -33,8 +34,9 @@ impl EguiApp {
         Self {
             backend_thread_handle: Some(backend_thread_handle),
             file_handler: Default::default(),
-            search: Default::default(),
+            plotter: Plotter::new(),
             request_tx,
+            search: Default::default(),
             ui_selection: UISelection::Plot,
         }
     }
@@ -79,7 +81,7 @@ impl EguiApp {
 
         use UISelection as U;
         match self.ui_selection {
-            U::Plot => self.plot(ui, ctx),
+            U::Plot => self.plotter.render(&mut self.file_handler, ui, ctx),
             U::FileSettings => self.file_handler.render_groups(ui, ctx),
         }
     }
@@ -108,10 +110,5 @@ impl EguiApp {
                 });
             };
         });
-    }
-
-    fn plot(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
-        use egui_plot::Plot;
-        Plot::new("Plot").show(ui, |_plot_ui| {});
     }
 }

@@ -11,19 +11,20 @@ pub struct FileID(usize);
 
 #[derive(Default, Debug)]
 pub struct FileHandler {
-    groups: HashMap<GroupID, Group>,
-    registry: HashMap<FileID, File>,
+    pub groups: HashMap<GroupID, Group>,
+    pub registry: HashMap<FileID, File>,
     next_id: FileID,
 }
 
 #[derive(Debug)]
-struct File {
+pub struct File {
     path: PathBuf,
 }
 
 #[derive(Debug)]
-struct Group {
-    file_ids: HashSet<FileID>,
+pub struct Group {
+    pub file_ids: HashSet<FileID>,
+    pub is_plotted: bool,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Eq, Ord)]
@@ -59,6 +60,7 @@ impl FileHandler {
                 new_file_id_set.insert(fid.clone());
                 let new_grp = Group {
                     file_ids: new_file_id_set,
+                    is_plotted: false,
                 };
                 self.groups.insert(gid, new_grp);
             };

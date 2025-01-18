@@ -16,8 +16,7 @@ fn main() -> eframe::Result {
     // start backend loop
     let (command_tx, command_rx) = std::sync::mpsc::channel();
     let backend_state = BackendAppState::new(
-        PathBuf::from_str("/home/nluetts/ownCloud/Cookie-Measurement-Data/")
-            .expect("unable to open demo file path"),
+        PathBuf::from_str(csv_plotter::ROOT_PATH).expect("unable to open demo file path"),
     );
     let eventloop_handle = BackendEventLoop::new(command_rx, backend_state).run();
 

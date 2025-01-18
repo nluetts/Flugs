@@ -40,13 +40,35 @@ impl super::Search {
         let modal = egui::Modal::new("search_popup".into()).area(draw_area);
 
         let modal_ui = |ui: &mut egui::Ui| {
-            let read_current_ui_enabled = self.read_current_child_paths.is_up_to_date();
+            let read_current_ui_enabled = self.search_path.is_up_to_date();
 
+            // UI for search path loading and updating
             ui.add_enabled_ui(read_current_ui_enabled, |ui| {
-                if ui.button("Read Paths").clicked() {
-                    self.request_current_child_paths(request_tx);
-                }
+                ui.label("current search root path:");
+                ui.horizontal(|ui| {
+                    ui.label(self.search_path.value_mut().to_string_lossy());
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .small_button("↺")
+                            .on_hover_text("re-index search path")
+                            .clicked()
+                        {
+                            let new_path = self.search_path.value_mut().clone();
+                            self.set_search_path(&new_path, request_tx);
+                        }
+                        if ui
+                            .small_button("...")
+                            .on_hover_text("change search path")
+                            .clicked()
+                        {
+                            let new_path = rfd::FileDialog::new().pick_folder().unwrap_or_default();
+                            self.set_search_path(&new_path, request_tx);
+                        }
+                    })
+                });
             });
+
+            ui.separator();
 
             let phrase_input = ui.add(
                 egui::TextEdit::singleline(&mut self.search_query).desired_width(search_text_width),
@@ -75,7 +97,7 @@ impl super::Search {
             self.popup_shown = false;
             let to_load: HashSet<(PathBuf, GroupID)> = self
                 .matched_paths
-                .value()
+                .value_mut()
                 .drain(..)
                 .filter_map(|(path, _, group_id)| group_id.map(|gid| (path, gid)))
                 .collect();
@@ -91,7 +113,7 @@ impl super::Search {
         let height = 600.0;
 
         let scroll_area = |ui: &mut egui::Ui| {
-            for (fp, indices, group_id) in self.matched_paths.value() {
+            for (fp, indices, group_id) in self.matched_paths.value_mut() {
                 if indices.is_empty() {
                     break;
                 }

@@ -1,9 +1,10 @@
 mod components;
 
 use self::components::{Plotter, Search};
-use crate::file_handling::FileHandler;
 use crate::BackendAppState;
+use crate::{file_handling::FileHandler, ROOT_PATH};
 
+use std::path::PathBuf;
 use std::{sync::mpsc::Sender, thread::JoinHandle};
 
 use app_core::backend::BackendRequest;
@@ -38,15 +39,21 @@ impl UISelection {
 impl EguiApp {
     pub fn new(
         _cc: &eframe::CreationContext<'_>,
-        request_tx: Sender<Box<dyn BackendRequest<BackendAppState>>>,
+        mut request_tx: Sender<Box<dyn BackendRequest<BackendAppState>>>,
         backend_thread_handle: JoinHandle<()>,
     ) -> Self {
+        // initialize search component with root path and index
+        // subpaths
+        let mut search = Search::default();
+        let search_path = PathBuf::from(ROOT_PATH);
+        search.set_search_path(&search_path, &mut request_tx);
+
         Self {
             backend_thread_handle: Some(backend_thread_handle),
             file_handler: Default::default(),
             plotter: Plotter::new(),
             request_tx,
-            search: Default::default(),
+            search,
             shortcuts_modal_open: false,
             ui_selection: UISelection::Plot,
         }
@@ -120,6 +127,8 @@ impl EguiApp {
                     );
                 });
 
+                ui.toggle_value(&mut self.shortcuts_modal_open, "Help");
+
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     egui::widgets::global_theme_preference_buttons(ui);
                 });
@@ -128,19 +137,24 @@ impl EguiApp {
     }
 
     fn render_shortcut_modal(&mut self, ctx: &egui::Context) {
-        if ctx.input(|i| i.key_released(egui::Key::F1)) {
+        if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
             self.shortcuts_modal_open = !self.shortcuts_modal_open;
         }
         if self.shortcuts_modal_open {
-            egui::Modal::new("shortcut_modal".into()).show(ctx, |ui| {
-                ui.heading("Keyboard Shortcuts");
-                ui.separator();
-                ui.label("F1 = Show Keyboard Shortcuts");
-                ui.separator();
-                ui.label("F3 = Cycle View");
-                ui.separator();
-                ui.label("CTRL + Space = Open Search Menu");
-            });
+            if egui::Modal::new("shortcut_modal".into())
+                .show(ctx, |ui| {
+                    ui.heading("Keyboard Shortcuts");
+                    ui.separator();
+                    ui.label("F1 = Show Keyboard Shortcuts");
+                    ui.separator();
+                    ui.label("F3 = Cycle View");
+                    ui.separator();
+                    ui.label("CTRL + Space = Open Search Menu");
+                })
+                .should_close()
+            {
+                self.shortcuts_modal_open = false;
+            };
         }
     }
 }

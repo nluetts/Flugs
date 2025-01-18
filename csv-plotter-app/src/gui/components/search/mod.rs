@@ -3,7 +3,7 @@ mod ui;
 
 use std::{collections::HashSet, path::PathBuf};
 
-use app_core::{backend::LinkReceiver, frontend::UIParameter};
+use app_core::frontend::UIParameter;
 
 use crate::file_handling::GroupID;
 
@@ -11,7 +11,6 @@ use crate::file_handling::GroupID;
 pub struct Search {
     matched_paths: UIParameter<Vec<(PathBuf, HashSet<usize>, Option<GroupID>)>>,
     popup_shown: bool,
-    read_current_child_paths: UIParameter<()>,
+    search_path: UIParameter<PathBuf>,
     search_query: String,
-    _requested_loading: Vec<LinkReceiver<PathBuf>>,
 }

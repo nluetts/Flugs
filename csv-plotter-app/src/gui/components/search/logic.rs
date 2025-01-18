@@ -9,18 +9,22 @@ use crate::{gui::DynRequestSender, BackendAppState};
 
 impl super::Search {
     pub fn try_update(&mut self) {
-        self.read_current_child_paths.try_update();
+        self.search_path.try_update();
         self.matched_paths.try_update();
     }
 
-    pub(super) fn request_current_child_paths(&mut self, request_tx: &mut DynRequestSender) {
+    pub fn set_search_path(&mut self, new_path: &PathBuf, request_tx: &mut DynRequestSender) {
+        let new_path = new_path.to_owned();
         let (rx, linker) = BackendLink::new(
             "request child paths",
-            |b: &mut BackendEventLoop<BackendAppState>| {
+            move |b: &mut BackendEventLoop<BackendAppState>| {
+                b.state.set_search_path(&new_path);
+                // update index of files/paths
                 b.state.update_child_paths_unfiltered();
+                b.state.get_search_path()
             },
         );
-        self.read_current_child_paths.set_recv(rx);
+        self.search_path.set_recv(rx);
         request_tx
             .send(Box::new(linker))
             .expect(BACKEND_HUNG_UP_MSG);

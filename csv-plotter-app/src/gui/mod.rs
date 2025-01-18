@@ -16,6 +16,7 @@ pub struct EguiApp {
     plotter: Plotter,
     request_tx: DynRequestSender,
     search: Search,
+    shortcuts_modal_open: bool,
     ui_selection: UISelection,
 }
 
@@ -23,6 +24,15 @@ pub struct EguiApp {
 enum UISelection {
     Plot,
     FileSettings,
+}
+
+impl UISelection {
+    fn next(&self) -> Self {
+        match self {
+            UISelection::Plot => Self::FileSettings,
+            UISelection::FileSettings => Self::Plot,
+        }
+    }
 }
 
 impl EguiApp {
@@ -37,6 +47,7 @@ impl EguiApp {
             plotter: Plotter::new(),
             request_tx,
             search: Default::default(),
+            shortcuts_modal_open: false,
             ui_selection: UISelection::Plot,
         }
     }
@@ -52,6 +63,10 @@ impl eframe::App for EguiApp {
         self.update_state();
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            if ctx.input(|i| i.key_pressed(egui::Key::F3)) {
+                self.ui_selection = self.ui_selection.next();
+            }
+            self.render_shortcut_modal(ctx);
             self.menu(ui, ctx);
         });
 
@@ -110,5 +125,22 @@ impl EguiApp {
                 });
             };
         });
+    }
+
+    fn render_shortcut_modal(&mut self, ctx: &egui::Context) {
+        if ctx.input(|i| i.key_released(egui::Key::F1)) {
+            self.shortcuts_modal_open = !self.shortcuts_modal_open;
+        }
+        if self.shortcuts_modal_open {
+            egui::Modal::new("shortcut_modal".into()).show(ctx, |ui| {
+                ui.heading("Keyboard Shortcuts");
+                ui.separator();
+                ui.label("F1 = Show Keyboard Shortcuts");
+                ui.separator();
+                ui.label("F3 = Cycle View");
+                ui.separator();
+                ui.label("CTRL + Space = Open Search Menu");
+            });
+        }
     }
 }

@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+mod logic;
 mod ui;
 
 use std::{collections::HashMap, path::PathBuf};
@@ -25,6 +26,8 @@ pub struct File {
 pub struct Group {
     pub file_ids: HashSet<FileID>,
     pub is_plotted: bool,
+    id: GroupID,
+    pub name: String,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Eq, Ord)]
@@ -45,27 +48,5 @@ impl FileID {
         let id = self.clone();
         self.0 += 1;
         id
-    }
-}
-
-impl FileHandler {
-    pub fn handle_search_results(&mut self, search_results: HashSet<(PathBuf, GroupID)>) {
-        for (fp, gid) in search_results.into_iter() {
-            let fid = self.next_id.next();
-
-            if let Some(mut grp) = self.groups.get_mut(&gid) {
-                grp.file_ids.insert(fid.clone());
-            } else {
-                let mut new_file_id_set = HashSet::new();
-                new_file_id_set.insert(fid.clone());
-                let new_grp = Group {
-                    file_ids: new_file_id_set,
-                    is_plotted: false,
-                };
-                self.groups.insert(gid, new_grp);
-            };
-
-            self.registry.insert(fid, File { path: fp });
-        }
     }
 }

@@ -13,7 +13,11 @@ use crate::{backend_state::CSVData, gui::DynRequestSender, BackendAppState};
 use super::{File, Group, GroupID};
 
 impl super::FileHandler {
-    pub fn handle_search_results(&mut self, search_results: HashSet<(PathBuf, GroupID)>) {
+    pub fn add_search_results(
+        &mut self,
+        search_results: HashSet<(PathBuf, GroupID)>,
+        search_path: &Path,
+    ) {
         for (fp, gid) in search_results.into_iter() {
             let fid = self.next_id.next();
 
@@ -34,7 +38,12 @@ impl super::FileHandler {
                 );
             };
 
-            self.registry.insert(fid, File { path: fp });
+            self.registry.insert(
+                fid,
+                File {
+                    path: search_path.join(fp),
+                },
+            );
         }
     }
 }

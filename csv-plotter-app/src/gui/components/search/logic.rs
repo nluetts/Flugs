@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use app_core::{
     backend::{BackendEventLoop, BackendLink, LinkReceiver},
@@ -28,6 +28,10 @@ impl super::Search {
         request_tx
             .send(Box::new(linker))
             .expect(BACKEND_HUNG_UP_MSG);
+    }
+
+    pub fn get_search_path(&self) -> &Path {
+        self.search_path.value()
     }
 
     pub(super) fn query_current_path(&mut self, request_tx: &mut DynRequestSender) {

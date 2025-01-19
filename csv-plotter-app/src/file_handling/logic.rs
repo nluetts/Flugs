@@ -1,4 +1,14 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
+
+use app_core::{
+    backend::{BackendEventLoop, BackendLink},
+    BACKEND_HUNG_UP_MSG,
+};
+
+use crate::{backend_state::CSVData, gui::DynRequestSender, BackendAppState};
 
 use super::{File, Group, GroupID};
 
@@ -27,4 +37,19 @@ impl super::FileHandler {
             self.registry.insert(fid, File { path: fp });
         }
     }
+}
+
+pub fn parse_csv(path: &Path, request_tx: &mut DynRequestSender) {
+    let path = path.to_owned();
+    let (rx, linker) = BackendLink::new(
+        &format!("load CSV data from file {:?}", path),
+        move |b: &mut BackendEventLoop<BackendAppState>| {
+            CSVData::from_path(&path);
+        },
+    );
+    request_tx
+        .send(Box::new(linker))
+        .expect(BACKEND_HUNG_UP_MSG);
+    rx.recv_timeout(std::time::Duration::from_secs(1))
+        .expect("Just temporary for debugging purposes");
 }

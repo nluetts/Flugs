@@ -104,7 +104,9 @@ impl EguiApp {
         use UISelection as U;
         match self.ui_selection {
             U::Plot => self.plotter.render(&mut self.file_handler, ui, ctx),
-            U::FileSettings => self.file_handler.render_groups(ui, ctx),
+            U::FileSettings => self
+                .file_handler
+                .render_groups(&mut self.request_tx, ui, ctx),
         }
     }
 

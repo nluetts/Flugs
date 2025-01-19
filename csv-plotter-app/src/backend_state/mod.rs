@@ -1,8 +1,10 @@
-use std::{collections::HashSet, path::PathBuf};
-
-use app_core::backend::BackendState;
+mod csv;
 
 use crate::file_handling::GroupID;
+use app_core::backend::BackendState;
+use std::{collections::HashSet, path::PathBuf};
+
+pub use csv::CSVData;
 
 #[derive(Default)]
 pub struct BackendAppState {

@@ -97,8 +97,11 @@ impl EguiApp {
 
         let search_results = self.search.render(&mut self.request_tx, ui, ctx);
         if !search_results.is_empty() {
-            self.file_handler
-                .add_search_results(search_results, self.search.get_search_path());
+            self.file_handler.add_search_results(
+                search_results,
+                self.search.get_search_path(),
+                &mut self.request_tx,
+            );
             log::info!("file handler updated: {:?}", self.file_handler);
         }
 

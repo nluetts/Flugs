@@ -4,7 +4,8 @@ use std::{
 };
 
 use app_core::{
-    backend::{BackendEventLoop, BackendLink},
+    backend::{BackendEventLoop, BackendLink, LinkReceiver},
+    frontend::UIParameter,
     BACKEND_HUNG_UP_MSG,
 };
 
@@ -17,6 +18,7 @@ impl super::FileHandler {
         &mut self,
         search_results: HashSet<(PathBuf, GroupID)>,
         search_path: &Path,
+        request_tx: &mut DynRequestSender,
     ) {
         for (fp, gid) in search_results.into_iter() {
             let fid = self.next_id.next();
@@ -26,7 +28,7 @@ impl super::FileHandler {
             } else {
                 let mut new_file_id_set = HashSet::new();
                 new_file_id_set.insert(fid.clone());
-                let name = format!("Group ({})", gid.0 + 1);
+                let name = format!("Group ({})", gid.0);
                 self.groups.insert(
                     gid.clone(),
                     Group {
@@ -38,27 +40,31 @@ impl super::FileHandler {
                 );
             };
 
+            let mut csv_data = UIParameter::new(Ok(CSVData::default()));
+            csv_data.set_recv(parse_csv(&fp, request_tx));
+
             self.registry.insert(
                 fid,
                 File {
                     path: search_path.join(fp),
+                    csv_data,
                 },
             );
         }
     }
 }
 
-pub fn parse_csv(path: &Path, request_tx: &mut DynRequestSender) {
+pub fn parse_csv(
+    path: &Path,
+    request_tx: &mut DynRequestSender,
+) -> LinkReceiver<Result<CSVData, String>> {
     let path = path.to_owned();
     let (rx, linker) = BackendLink::new(
         &format!("load CSV data from file {:?}", path),
-        move |b: &mut BackendEventLoop<BackendAppState>| {
-            CSVData::from_path(&path);
-        },
+        move |b: &mut BackendEventLoop<BackendAppState>| CSVData::from_path(&path),
     );
     request_tx
         .send(Box::new(linker))
         .expect(BACKEND_HUNG_UP_MSG);
-    rx.recv_timeout(std::time::Duration::from_secs(1))
-        .expect("Just temporary for debugging purposes");
+    rx
 }

@@ -3,9 +3,11 @@
 mod logic;
 mod ui;
 
+use std::collections::HashSet;
 use std::{collections::HashMap, path::PathBuf};
 
-use std::collections::HashSet;
+use crate::backend_state::CSVData;
+use app_core::frontend::UIParameter;
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub struct FileID(usize);
@@ -20,6 +22,7 @@ pub struct FileHandler {
 #[derive(Debug)]
 pub struct File {
     path: PathBuf,
+    csv_data: UIParameter<Result<CSVData, String>>,
 }
 
 #[derive(Debug)]

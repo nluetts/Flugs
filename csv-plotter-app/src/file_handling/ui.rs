@@ -14,7 +14,7 @@ impl FileHandler {
             ui.horizontal(|ui| {
                 let lab = ui.label("rename:");
                 ui.text_edit_singleline(&mut grp.name).labelled_by(lab.id);
-                ui.checkbox(&mut grp.is_plotted, "plot: ");
+                ui.checkbox(&mut grp.is_plotted, "plot?");
             });
             for f in grp.file_ids.iter() {
                 if let Some(file) = self.registry.get(f) {

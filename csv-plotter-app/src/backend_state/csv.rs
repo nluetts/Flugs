@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, path::Path};
 
+#[derive(Clone, Debug, Default)]
 pub struct CSVData {
     columns: Vec<Vec<f64>>,
     num_columns: usize,
@@ -83,9 +84,9 @@ impl CSVData {
                     }
                 })
                 .collect::<Vec<String>>()
-                .join("\n");
+                .join("\n")
         } else {
-            String::new();
+            String::new()
         };
 
         // Try to determine cell delimiter.
@@ -164,6 +165,55 @@ impl CSVData {
             delimiter.row_counter
         );
 
-        Err(String::new())
+        // We assume the most frequent number of delimiters per line
+        // yields the correct number of columns (no. delimter + 1).
+        let num_columns = delimiter
+            .row_counter
+            .iter()
+            .max_by(|(&num_a, &freq_a), (&num_b, &freq_b)| freq_b.cmp(&freq_a))
+            .ok_or(format!("Did not count any delimiters for file {:?}", path))?
+            .0
+            + 1;
+
+        // Finally, parse the contents of the file.
+        let mut columns: Vec<Vec<f64>> = (0..num_columns).map(|_| Vec::new()).collect();
+        let mut row_buffer: Vec<f64> = vec![0.0; num_columns];
+        let mut num_ignored = 0;
+        for row in raw_rows.iter() {
+            // Skip rows starting with comment char or non-digit, as well as
+            // empty rows.
+            if let Some(first_char) = row.chars().nth(0) {
+                if first_char == comment_char || !first_char.is_ascii_digit() {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+
+            for (i, entry) in row.split(delimiter.char).into_iter().enumerate() {
+                // Remove whitespace and `"` (if present) before parsing.
+                match entry.trim().trim_matches('"').parse::<f64>() {
+                    Ok(num) => row_buffer[i] = num,
+                    Err(_) => {
+                        // If we cannot parse an entry, we ignore the entire row.
+                        num_ignored += 1;
+                        continue;
+                    }
+                }
+            }
+            for (i, num) in row_buffer.iter().enumerate() {
+                columns[i].push(*num);
+            }
+        }
+
+        log::debug!(
+            "parsing {:?} succesful",
+            path.file_name().and_then(|p| p.to_str()).unwrap_or("file")
+        );
+        Ok(CSVData {
+            columns,
+            num_columns,
+            comments,
+        })
     }
 }

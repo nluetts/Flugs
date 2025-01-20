@@ -1,9 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use app_core::{
-    backend::{BackendEventLoop, BackendLink, LinkReceiver},
-    BACKEND_HUNG_UP_MSG,
-};
+use app_core::backend::{BackendEventLoop, BackendLink};
 
 use crate::{gui::DynRequestSender, BackendAppState};
 
@@ -13,9 +10,10 @@ impl super::Search {
         self.matched_paths.try_update();
     }
 
-    pub fn set_search_path(&mut self, new_path: &PathBuf, request_tx: &mut DynRequestSender) {
-        let new_path = new_path.to_owned();
-        let (rx, linker) = BackendLink::new(
+    pub fn set_search_path(&mut self, path: &PathBuf, request_tx: &mut DynRequestSender) {
+        let new_path = path.to_owned();
+        BackendLink::request_parameter_update(
+            &mut self.search_path,
             "request child paths",
             move |b: &mut BackendEventLoop<BackendAppState>| {
                 b.state.set_search_path(&new_path);
@@ -23,11 +21,8 @@ impl super::Search {
                 b.state.update_child_paths_unfiltered();
                 b.state.get_search_path()
             },
+            request_tx,
         );
-        self.search_path.set_recv(rx);
-        request_tx
-            .send(Box::new(linker))
-            .expect(BACKEND_HUNG_UP_MSG);
     }
 
     pub fn get_search_path(&self) -> &Path {
@@ -36,35 +31,11 @@ impl super::Search {
 
     pub(super) fn query_current_path(&mut self, request_tx: &mut DynRequestSender) {
         let query = self.search_query.to_owned();
-        let (rx, linker) = BackendLink::new(
+        BackendLink::request_parameter_update(
+            &mut self.matched_paths,
             "fuzzy match child paths",
             move |b: &mut BackendEventLoop<BackendAppState>| b.state.search_filter(&query),
+            request_tx,
         );
-        self.matched_paths.set_recv(rx);
-        request_tx
-            .send(Box::new(linker))
-            .expect(BACKEND_HUNG_UP_MSG);
-    }
-
-    pub(super) fn _request_load_file(
-        &self,
-        fp: &PathBuf,
-        request_tx: &mut DynRequestSender,
-    ) -> LinkReceiver<PathBuf> {
-        let fp = fp.to_owned();
-        let log_message = format!(
-            "load {}",
-            fp.file_name()
-                .unwrap_or_else(|| panic!("Invalid file path requested: {:?}", fp))
-                .to_string_lossy()
-        );
-        let (rx, linker) = BackendLink::new(
-            &log_message,
-            move |b: &mut BackendEventLoop<BackendAppState>| b.state.load_file(&fp),
-        );
-        request_tx
-            .send(Box::new(linker))
-            .expect(BACKEND_HUNG_UP_MSG);
-        rx
     }
 }

@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use std::{ascii::AsciiExt, collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path};
 
 pub struct CSVData {
     columns: Vec<Vec<f64>>,
@@ -8,30 +8,37 @@ pub struct CSVData {
     comments: String,
 }
 
+// Helper struct to counts frequencies of potential delimiter characters.
+struct DelimiterCounter {
+    char: char,
+    // How often a certain count per row is found.
+    row_counter: HashMap<usize, usize>,
+}
+
 impl CSVData {
     pub fn from_path(path: &Path) -> Result<CSVData, String> {
-        log::debug!("reading raw lines for {:?}", path);
-        // Read file contents into vector of lines (raw strings).
-        let raw_lines: Vec<String> = {
+        log::debug!("reading raw rows for {:?}", path);
+        // Read file contents into vector of rows (raw strings).
+        let raw_rows: Vec<String> = {
             let raw_text = std::fs::read_to_string(path)
                 .map_err(|e| format!("Unable to open file {:?}: {}", path, e))?;
             raw_text
                 .split('\n')
-                .map(|line| {
-                    let line = line.to_owned();
+                .map(|row| {
+                    let row = row.to_owned();
                     // Remove surrounding whitespace.
-                    line.trim();
-                    line
+                    row.trim();
+                    row
                 })
                 .collect()
         };
 
         // Try to determine comment character.
         //
-        // We count the frequency of the first characters in the raw lines,
+        // We count the frequency of the first characters in the raw rows,
         // ignoring digits and whitespace.
-        let count_frequency_first_char = |mut counts: HashMap<char, usize>, line: &String| {
-            if let Some(character) = line.chars().nth(0) {
+        let count_frequency_first_char = |mut counts: HashMap<char, usize>, row: &String| {
+            if let Some(character) = row.chars().nth(0) {
                 if character.is_ascii_digit() || character.is_whitespace() {
                     return counts;
                 }
@@ -43,9 +50,9 @@ impl CSVData {
             }
             counts
         };
-        let (comment_char, counts) = raw_lines
+        let (comment_char, counts) = raw_rows
             .iter()
-            // This counts the frequencies of the first character in `raw_lines`
+            // This counts the frequencies of the first character in `raw_rows`
             // and returns a hash map of character => counts.
             .fold(HashMap::new(), count_frequency_first_char)
             .into_iter()
@@ -66,11 +73,11 @@ impl CSVData {
 
         // Read out the comments in the CSV file, if any.
         let comments = if counts > 0 {
-            raw_lines
+            raw_rows
                 .iter()
-                .filter_map(|line| {
-                    if line.starts_with(comment_char) {
-                        Some(line.to_owned())
+                .filter_map(|row| {
+                    if row.starts_with(comment_char) {
+                        Some(row.to_owned())
                     } else {
                         None
                     }
@@ -83,51 +90,78 @@ impl CSVData {
 
         // Try to determine cell delimiter.
         //
-        // We do something very similar to the above, we counts all character
-        // in the lines which are not comments and select the character with the
-        // highest occurance.
-        let count_frequencies_delimiter = |mut counts: HashMap<char, usize>, line: &String| {
-            for char in line.chars() {
-                if char.is_ascii_digit() || ['.', 'e', 'E', '+', '-'].contains(&char) {
-                    continue;
-                }
-                if let Some(count) = counts.get_mut(&char) {
-                    *count += 1;
-                } else {
-                    counts.insert(char, 1);
-                }
-            }
-            counts
+        // In the rows holding data, count the frequencies of all characters
+        // that could potentially be delimiter characters. Counting is done on
+        // a per row basis, i.e. the result is a hash map mapping the number of
+        // occurances per line to a line count.
+        let init_delim_char = DelimiterCounter {
+            char: '#',
+            row_counter: HashMap::new(),
         };
-
-        let (delimiter_char, counts) = raw_lines
+        let init_counter: HashMap<char, DelimiterCounter> = HashMap::new();
+        let delimiter = raw_rows
             .iter()
-            // We only consider lines which start with digits.
-            .filter(|line| {
-                line.chars()
-                    .nth(0)
-                    .map(|char| char.is_ascii_digit())
-                    .unwrap_or_default()
+            .fold(init_counter, |mut counter, row| {
+                // Count delimiter chars in curent row.
+                let mut delimiter_counts_current_row: HashMap<char, usize> = HashMap::new();
+                for (i, c) in row.chars().enumerate() {
+                    // We assume that only rows starting with digits contain data.
+                    if i == 0 && !c.is_ascii_digit() {
+                        return counter;
+                    }
+                    // Characters `.`, `e`, `E`, `+`, `-` (all characters that
+                    // can occur in scientific numbers, but which are never used
+                    // as delimiters, plus the quote sign) are ignored.
+                    if c.is_ascii_digit() || ['.', 'e', 'E', '+', '-', '"'].contains(&c) {
+                        continue;
+                    }
+                    if let Some(counts) = delimiter_counts_current_row.get_mut(&c) {
+                        *counts += 1;
+                    } else {
+                        delimiter_counts_current_row.insert(c, 1);
+                    }
+                }
+                // Merge the result of the current row with `counter`.
+                for (c, count) in delimiter_counts_current_row.into_iter() {
+                    if let Some(ctr) = counter.get_mut(&c) {
+                        // We note how often we have seen this count for this specific char `c`.
+                        if let Some(row_count) = ctr.row_counter.get_mut(&count) {
+                            *row_count += 1;
+                        } else {
+                            ctr.row_counter.insert(count, 1);
+                        }
+                    } else {
+                        let mut row_counter = HashMap::new();
+                        row_counter.insert(count, 1);
+                        counter.insert(
+                            c,
+                            DelimiterCounter {
+                                char: c,
+                                row_counter,
+                            },
+                        );
+                    }
+                }
+                counter
             })
-            // This counts the frequencies of all non-digit characters, except
-            // `.`, `e`, `E`, `+`, `-` (all characters that can occur in
-            // scientific numbers, but which are never used as delimiters) and
-            // returns a hash map of character => counts.
-            .fold(HashMap::new(), count_frequencies_delimiter)
-            .into_iter()
-            // This reduces the hash map to the character with the highest
-            // number of counts
-            .fold((',', 0), |(char_a, counts_a), (char_b, counts_b)| {
-                if counts_b > counts_a {
-                    (char_b, counts_b)
+            .into_values()
+            // This reduces the hash map to the delimiter character with the
+            // highest number of counts.
+            .fold(init_delim_char, |delim_counter_a, delim_counter_b| {
+                if delim_counter_b.row_counter.values().sum::<usize>()
+                    > delim_counter_a.row_counter.values().sum()
+                {
+                    delim_counter_b
                 } else {
-                    (char_a, counts_a)
+                    delim_counter_a
                 }
             });
+
         log::debug!(
-            "delimiter character {} with {} counts found",
-            delimiter_char,
-            counts
+            "delimiter character {} with {} counts found (per row counts: {:?})",
+            delimiter.char,
+            delimiter.row_counter.values().sum::<usize>(),
+            delimiter.row_counter
         );
 
         Err(String::new())

@@ -8,7 +8,13 @@ use std::{
     },
 };
 
-use crate::backend::{BackendEventLoop, BackendState};
+use crate::{
+    backend::{BackendEventLoop, BackendState},
+    frontend::UIParameter,
+    BACKEND_HUNG_UP_MSG,
+};
+
+type DynRequestSender<S> = Sender<Box<dyn BackendRequest<S>>>;
 
 /// The linker is send to the backend thread and replies
 /// once the action ran on the backend.
@@ -54,6 +60,40 @@ where
     }
 }
 
+impl<T, F, S> BackendLink<T, F, S>
+where
+    F: Fn(&mut BackendEventLoop<S>) -> T + Send + 'static,
+    S: BackendState + Send + 'static,
+    T: Clone + Send + 'static,
+{
+    pub fn request_parameter_update(
+        parameter: &mut UIParameter<T>,
+        description: &str,
+        action: F,
+        request_tx: &mut DynRequestSender<S>,
+    ) {
+        let (tx, rx) = channel();
+        let is_cancelled = Arc::new(AtomicBool::new(false));
+        let rx = LinkReceiver {
+            rx,
+            is_cancelled: is_cancelled.clone(),
+            description: description.to_owned(),
+        };
+        let linker = Self {
+            backchannel: tx,
+            action,
+            description: description.to_owned(),
+            is_cancelled,
+            _marker: PhantomData,
+        };
+
+        parameter.set_recv(rx);
+        request_tx
+            .send(Box::new(linker))
+            .expect(BACKEND_HUNG_UP_MSG);
+    }
+}
+
 pub trait BackendRequest<S>: Send
 where
     S: BackendState,
@@ -91,6 +131,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct LinkReceiver<T> {
     rx: Receiver<T>,
     is_cancelled: Arc<AtomicBool>,

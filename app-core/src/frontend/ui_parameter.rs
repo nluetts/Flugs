@@ -4,6 +4,7 @@ use log::warn;
 
 use crate::backend::LinkReceiver;
 
+#[derive(Debug)]
 pub struct UIParameter<T> {
     pending_update_rx: Option<LinkReceiver<T>>,
     value: T,

@@ -2,9 +2,6 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
 
-use log::info;
-use log::warn;
-
 use crate::backend::BackendLink;
 use crate::backend::BackendRequest;
 use crate::backend::BackendState;
@@ -22,9 +19,9 @@ impl<S: BackendState + Send + 'static> BackendEventLoop<S> {
     pub fn update(&mut self) -> bool {
         // handle the most important command
         while let Ok(request) = self.request_rx.try_recv() {
-            info!("handeling request '{}' ...", request.describe());
+            log::debug!("handeling request '{}' ...", request.describe());
             request.run_on_backend(self);
-            info!("... finished.")
+            log::debug!("... finished.")
         }
         self.should_stop
     }
@@ -32,13 +29,13 @@ impl<S: BackendState + Send + 'static> BackendEventLoop<S> {
         std::thread::spawn(move || loop {
             let stop_loop = self.update();
             if stop_loop {
-                info!("stopping backend event loop");
+                log::debug!("stopping backend event loop");
                 break;
             }
         })
     }
     pub fn new(command_rx: Receiver<Box<dyn BackendRequest<S>>>, state: S) -> Self {
-        info!("creating new event loop");
+        log::debug!("creating new event loop");
         Self {
             state,
             request_rx: command_rx,
@@ -60,14 +57,14 @@ pub fn request_stop<S: BackendState + Send + 'static>(
             b.signal_stop();
             true
         });
-    info!("sending signal to end backend event loop");
+    log::debug!("sending signal to end backend event loop");
     if request_tx.send(Box::new(signal_end_linker)).is_ok() {
         if let Err(e) = rx.recv_timeout(std::time::Duration::from_secs(10)) {
-            warn!("did not receive a response after 10 seconds: {e}");
+            log::warn!("did not receive a response after 10 seconds: {e}");
         };
     };
     match backend_thread_handle.join() {
-        Ok(_) => info!("backend event loop ended"),
-        Err(e) => warn!("failed to signal event loop to stop: {e:?}"),
+        Ok(_) => log::debug!("backend event loop ended"),
+        Err(e) => log::warn!("failed to signal event loop to stop: {e:?}"),
     }
 }

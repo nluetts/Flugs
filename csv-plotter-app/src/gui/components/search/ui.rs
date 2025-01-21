@@ -102,7 +102,7 @@ impl super::Search {
                 .filter_map(|(path, _, group_id)| group_id.map(|gid| (path, gid)))
                 .collect();
             self.search_query.clear();
-            log::info!("returning {} paths to load", to_load.len());
+            log::debug!("returning {} paths to load", to_load.len());
             return to_load;
         };
         HashSet::new()

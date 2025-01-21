@@ -4,6 +4,7 @@ use log::warn;
 
 use crate::backend::LinkReceiver;
 
+#[derive(Debug)]
 pub struct UIParameter<T> {
     pending_update_rx: Option<LinkReceiver<T>>,
     value: T,
@@ -47,6 +48,10 @@ impl<T: Clone> UIParameter<T> {
 
     pub fn set_recv(&mut self, rx: LinkReceiver<T>) {
         self.pending_update_rx = Some(rx);
+    }
+
+    pub fn value_mut(&mut self) -> &mut T {
+        &mut self.value
     }
 
     pub fn value(&self) -> &T {

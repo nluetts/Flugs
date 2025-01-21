@@ -1,13 +1,16 @@
 mod logic;
 mod ui;
 
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use app_core::frontend::UIParameter;
 
+use crate::gui::components::GroupID;
+
 #[derive(Default)]
 pub struct Search {
-    matched_paths: UIParameter<Vec<(PathBuf, std::collections::HashSet<usize>)>>,
-    read_current_child_paths: UIParameter<()>,
+    matched_paths: UIParameter<Vec<(PathBuf, HashSet<usize>, Option<GroupID>)>>,
+    popup_shown: bool,
+    search_path: UIParameter<PathBuf>,
     search_query: String,
 }

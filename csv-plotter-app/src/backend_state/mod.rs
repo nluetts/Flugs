@@ -1,10 +1,17 @@
-use std::{collections::HashSet, path::PathBuf};
+mod csv;
 
+use crate::gui::GroupID;
 use app_core::backend::BackendState;
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
+
+pub use csv::CSVData;
 
 #[derive(Default)]
 pub struct BackendAppState {
-    current_path: PathBuf,
+    search_path: PathBuf,
     child_paths_unfiltered: Vec<PathBuf>,
     _id_counter: usize,
 }
@@ -12,9 +19,9 @@ pub struct BackendAppState {
 impl BackendState for BackendAppState {}
 
 impl BackendAppState {
-    pub fn new(current_path: PathBuf) -> Self {
+    pub fn new(search_path: PathBuf) -> Self {
         Self {
-            current_path,
+            search_path,
             child_paths_unfiltered: Vec::new(),
             _id_counter: 0,
         }
@@ -27,7 +34,7 @@ impl BackendAppState {
     /// (`current_path`)
     pub fn update_child_paths_unfiltered(&mut self) {
         let mut file_paths = Vec::new();
-        let mut dirs = vec![self.current_path.to_path_buf()];
+        let mut dirs = vec![self.search_path.to_path_buf()];
 
         while let Some(current_path) = dirs.pop() {
             for path in std::fs::read_dir(&current_path)
@@ -39,7 +46,11 @@ impl BackendAppState {
                 if path.is_dir() {
                     dirs.push(path);
                 } else if path.is_file() {
-                    file_paths.push(path);
+                    let p = path
+                        .as_path()
+                        .strip_prefix(&self.search_path)
+                        .expect("failed to strip search path from sub directory");
+                    file_paths.push(p.to_path_buf());
                 }
             }
         }
@@ -47,12 +58,20 @@ impl BackendAppState {
         self.child_paths_unfiltered = file_paths;
     }
 
+    pub fn get_search_path(&self) -> PathBuf {
+        self.search_path.clone()
+    }
+
+    pub fn set_search_path(&mut self, new_path: &Path) {
+        self.search_path = new_path.to_path_buf();
+    }
+
     /// Return the best file path matches for `query`, together with the
     /// corresponding matching indices in the file path.
     ///
     /// For a file path to match, the file path must contain all words
     /// (separated by white space).
-    pub fn search_filter(&self, query: &str) -> Vec<(PathBuf, HashSet<usize>)> {
+    pub fn search_filter(&self, query: &str) -> Vec<(PathBuf, HashSet<usize>, Option<GroupID>)> {
         let contains_query = |filename: &&PathBuf| {
             let fp = filename.to_str();
             if fp.is_none() {
@@ -68,7 +87,7 @@ impl BackendAppState {
                 let idx = fp.find(q)?;
                 indices.extend(idx..idx + q.len());
             }
-            Some((filename.to_owned(), indices))
+            Some((filename.to_owned(), indices, None))
         };
 
         self.child_paths_unfiltered
@@ -77,5 +96,9 @@ impl BackendAppState {
             .take(10)
             .filter_map(query_indices)
             .collect()
+    }
+
+    pub fn load_file(&self, path: &PathBuf) -> PathBuf {
+        path.to_owned()
     }
 }

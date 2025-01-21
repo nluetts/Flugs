@@ -1,8 +1,11 @@
 mod csv;
 
-use crate::file_handling::GroupID;
+use crate::gui::GroupID;
 use app_core::backend::BackendState;
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 pub use csv::CSVData;
 
@@ -59,8 +62,8 @@ impl BackendAppState {
         self.search_path.clone()
     }
 
-    pub fn set_search_path(&mut self, new_path: &PathBuf) {
-        self.search_path = new_path.clone();
+    pub fn set_search_path(&mut self, new_path: &Path) {
+        self.search_path = new_path.to_path_buf();
     }
 
     /// Return the best file path matches for `query`, together with the

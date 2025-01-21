@@ -2,12 +2,13 @@ mod components;
 
 use self::components::{Plotter, Search};
 use crate::BackendAppState;
-use crate::{file_handling::FileHandler, ROOT_PATH};
+use crate::ROOT_PATH;
+use app_core::backend::BackendRequest;
+
+pub use crate::gui::components::{FileHandler, GroupID};
 
 use std::path::PathBuf;
 use std::{sync::mpsc::Sender, thread::JoinHandle};
-
-use app_core::backend::BackendRequest;
 
 pub type DynRequestSender = Sender<Box<dyn BackendRequest<BackendAppState>>>;
 
@@ -60,7 +61,7 @@ impl EguiApp {
     }
 
     fn update_state(&mut self) {
-        // self.file_handler.try_update();
+        self.file_handler.try_update();
         self.search.try_update();
     }
 }
@@ -96,13 +97,14 @@ impl EguiApp {
         });
 
         let search_results = self.search.render(&mut self.request_tx, ui, ctx);
+        let num_results = search_results.len();
         if !search_results.is_empty() {
             self.file_handler.add_search_results(
                 search_results,
                 self.search.get_search_path(),
                 &mut self.request_tx,
             );
-            log::info!("file handler updated: {:?}", self.file_handler);
+            log::debug!("file handler updated with {} new entries", num_results);
         }
 
         use UISelection as U;
@@ -146,8 +148,8 @@ impl EguiApp {
         if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
             self.shortcuts_modal_open = !self.shortcuts_modal_open;
         }
-        if self.shortcuts_modal_open {
-            if egui::Modal::new("shortcut_modal".into())
+        if self.shortcuts_modal_open
+            && egui::Modal::new("shortcut_modal".into())
                 .show(ctx, |ui| {
                     ui.heading("Keyboard Shortcuts");
                     ui.separator();
@@ -158,9 +160,8 @@ impl EguiApp {
                     ui.label("CTRL + Space = Open Search Menu");
                 })
                 .should_close()
-            {
-                self.shortcuts_modal_open = false;
-            };
-        }
+        {
+            self.shortcuts_modal_open = false;
+        };
     }
 }

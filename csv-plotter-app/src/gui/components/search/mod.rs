@@ -5,7 +5,7 @@ use std::{collections::HashSet, path::PathBuf};
 
 use app_core::frontend::UIParameter;
 
-use crate::file_handling::GroupID;
+use crate::gui::components::GroupID;
 
 #[derive(Default)]
 pub struct Search {

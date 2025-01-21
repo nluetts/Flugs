@@ -2,14 +2,25 @@
 
 use std::{collections::HashMap, path::Path};
 
+use app_core::frontend::UIParameter;
+
+#[derive(Debug, Default, Clone)]
+pub struct CSVCache {
+    pub data: Vec<[f64; 2]>,
+    pub xcol: Option<usize>,
+    pub ycol: usize,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct CSVData {
     columns: Vec<Vec<f64>>,
     num_columns: usize,
     comments: String,
+    cache: CSVCache,
 }
 
 // Helper struct to counts frequencies of potential delimiter characters.
+#[derive(Debug)]
 struct DelimiterCounter {
     char: char,
     // How often a certain count per row is found.
@@ -33,6 +44,8 @@ impl CSVData {
                 })
                 .collect()
         };
+        // DEBUG OK
+        dbg!(raw_rows.get(0));
 
         // Try to determine comment character.
         //
@@ -160,9 +173,9 @@ impl CSVData {
 
         log::debug!(
             "delimiter character {} with {} counts found (per row counts: {:?})",
-            delimiter.char,
-            delimiter.row_counter.values().sum::<usize>(),
-            delimiter.row_counter
+            &delimiter.char,
+            &delimiter.row_counter.values().sum::<usize>(),
+            &delimiter.row_counter
         );
 
         // We assume the most frequent number of delimiters per line
@@ -179,7 +192,8 @@ impl CSVData {
         let mut columns: Vec<Vec<f64>> = (0..num_columns).map(|_| Vec::new()).collect();
         let mut row_buffer: Vec<f64> = vec![0.0; num_columns];
         let mut num_ignored = 0;
-        for row in raw_rows.iter() {
+        'outer: for (i, row) in raw_rows.iter().enumerate() {
+            log::debug!("parse row '{}'", &row);
             // Skip rows starting with comment char or non-digit, as well as
             // empty rows.
             if let Some(first_char) = row.chars().nth(0) {
@@ -190,11 +204,13 @@ impl CSVData {
                 continue;
             }
 
-            for (i, entry) in row.split(delimiter.char).into_iter().enumerate() {
+            for (j, entry) in row.split(delimiter.char).enumerate() {
                 // Remove whitespace and `"` (if present) before parsing.
                 match entry.trim().trim_matches('"').parse::<f64>() {
-                    Ok(num) => row_buffer[i] = num,
-                    Err(_) => {
+                    Ok(num) => row_buffer[j] = num,
+                    Err(e) => {
+                        log::debug!("failed to parse row {i} entry {j}: {e}");
+                        break 'outer;
                         // If we cannot parse an entry, we ignore the entire row.
                         num_ignored += 1;
                         continue;
@@ -206,14 +222,57 @@ impl CSVData {
             }
         }
 
+        for i in 0..num_columns {
+            dbg!(&columns[i][0]);
+        }
+
         log::debug!(
             "parsing {:?} succesful",
             path.file_name().and_then(|p| p.to_str()).unwrap_or("file")
         );
+
+        let cache = if let Some(cache) = CSVCache::new(&columns, Some(0), 1) {
+            log::debug!("add first two columns to cache");
+            cache
+        } else {
+            log::debug!("add first column to cache");
+            CSVCache::new(&columns, None, 0)
+                .ok_or(format!("unable to load cache for {:?}", path))?
+        };
+
+        // DEBUG
+        // std::thread::sleep_ms(10000);
+
         Ok(CSVData {
             columns,
             num_columns,
             comments,
+            cache,
         })
+    }
+
+    pub fn get_cache(&self) -> &CSVCache {
+        &self.cache
+    }
+}
+
+impl CSVCache {
+    fn new(columns: &Vec<Vec<f64>>, xcol: Option<usize>, ycol: usize) -> Option<Self> {
+        let ydata = columns.get(ycol)?;
+        let data = if let Some(xdata) = xcol.map(|i| columns.get(i))? {
+            ydata
+                .into_iter()
+                .zip(xdata.into_iter())
+                .map(|(y, x)| [*x, *y])
+                .collect()
+        } else {
+            let n = ydata.len();
+            ydata
+                .into_iter()
+                .zip(0..n)
+                .map(|(y, n)| [n as f64, *y])
+                .collect()
+        };
+        Some(Self { data, xcol, ycol })
     }
 }

@@ -22,8 +22,9 @@ impl<S: BackendState + Send + 'static> BackendEventLoop<S> {
     pub fn update(&mut self) -> bool {
         // handle the most important command
         while let Ok(request) = self.request_rx.try_recv() {
-            info!("handeling request '{}'", request.describe());
+            info!("handeling request '{}' ...", request.describe());
             request.run_on_backend(self);
+            info!("... finished.")
         }
         self.should_stop
     }

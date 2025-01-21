@@ -5,7 +5,7 @@ use std::{
 
 use egui::{text::LayoutJob, Color32, FontId, InputState, Label, Pos2, TextFormat};
 
-use crate::{file_handling::GroupID, gui::DynRequestSender};
+use crate::{gui::components::GroupID, gui::DynRequestSender};
 
 impl super::Search {
     pub fn render(

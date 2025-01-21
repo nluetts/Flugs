@@ -11,9 +11,19 @@ use app_core::{
 
 use crate::{backend_state::CSVData, gui::DynRequestSender, BackendAppState};
 
-use super::{File, Group, GroupID};
+use super::{File, FileHandler, Group, GroupID};
 
-impl super::FileHandler {
+impl File {
+    pub fn get_cache(&self) -> Option<&Vec<[f64; 2]>> {
+        self.csv_data
+            .value()
+            .as_ref()
+            .map(|dat| &dat.get_cache().data)
+            .ok()
+    }
+}
+
+impl FileHandler {
     pub fn add_search_results(
         &mut self,
         search_results: HashSet<(PathBuf, GroupID)>,
@@ -41,7 +51,7 @@ impl super::FileHandler {
             };
 
             let mut csv_data = UIParameter::new(Ok(CSVData::default()));
-            csv_data.set_recv(parse_csv(&fp, request_tx));
+            csv_data.set_recv(parse_csv(&search_path.join(&fp), request_tx));
 
             self.registry.insert(
                 fid,
@@ -50,6 +60,12 @@ impl super::FileHandler {
                     csv_data,
                 },
             );
+        }
+    }
+
+    pub fn try_update(&mut self) {
+        for file in self.registry.values_mut() {
+            file.csv_data.try_update();
         }
     }
 }

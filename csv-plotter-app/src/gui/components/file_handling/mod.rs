@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 mod logic;
 mod ui;
 
@@ -29,7 +27,7 @@ pub struct File {
 pub struct Group {
     pub file_ids: HashSet<FileID>,
     pub is_plotted: bool,
-    id: GroupID,
+    _id: GroupID,
     pub name: String,
 }
 

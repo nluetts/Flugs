@@ -31,9 +31,32 @@ impl FileHandler {
         request_tx: &mut DynRequestSender,
     ) {
         for (fp, gid) in search_results.into_iter() {
-            let fid = self.next_id.next();
+            // If file is already registered, we pull its ID from the registry,
+            // otherwise we create a new ID and add the file to the registry.
+            let fid = if let Some((fid, _)) = self
+                .registry
+                .iter()
+                .filter(|(_, file)| file.path == search_path.join(&fp))
+                .next()
+            {
+                fid.clone()
+            } else {
+                let fid = self.next_id.next();
+                let mut csv_data = UIParameter::new(Ok(CSVData::default()));
+                csv_data.set_recv(parse_csv(&search_path.join(&fp), request_tx));
 
-            if let Some(mut grp) = self.groups.get_mut(&gid) {
+                self.registry.insert(
+                    fid.clone(),
+                    File {
+                        path: search_path.join(fp),
+                        csv_data,
+                    },
+                );
+                fid
+            };
+
+            // Add the ID to the group requested by user.
+            if let Some(grp) = self.groups.get_mut(&gid) {
                 grp.file_ids.insert(fid.clone());
             } else {
                 let mut new_file_id_set = HashSet::new();
@@ -44,22 +67,27 @@ impl FileHandler {
                     Group {
                         file_ids: new_file_id_set,
                         is_plotted: false,
-                        id: gid,
+                        _id: gid,
                         name,
                     },
                 );
             };
+        }
+    }
 
-            let mut csv_data = UIParameter::new(Ok(CSVData::default()));
-            csv_data.set_recv(parse_csv(&search_path.join(&fp), request_tx));
+    pub fn remove(&mut self, to_delete: Vec<(super::GroupID, super::FileID)>) {
+        for (gid, fid) in to_delete {
+            if let Some(grp) = self.groups.get_mut(&gid) {
+                grp.file_ids.remove(&fid);
+            } else {
+                log::warn!("trying to remove file from group with ID {gid:?} which does not exist");
+            }
 
-            self.registry.insert(
-                fid,
-                File {
-                    path: search_path.join(fp),
-                    csv_data,
-                },
-            );
+            // If file with ID `fid` is not a member of any group, we remove it
+            // from the registry as well.
+            if !self.groups.values().any(|grp| grp.file_ids.contains(&fid)) {
+                self.registry.remove(&fid);
+            }
         }
     }
 
@@ -77,7 +105,7 @@ pub fn parse_csv(
     let path = path.to_owned();
     let (rx, linker) = BackendLink::new(
         &format!("load CSV data from file {:?}", path),
-        move |b: &mut BackendEventLoop<BackendAppState>| CSVData::from_path(&path),
+        move |_b: &mut BackendEventLoop<BackendAppState>| CSVData::from_path(&path),
     );
     request_tx
         .send(Box::new(linker))

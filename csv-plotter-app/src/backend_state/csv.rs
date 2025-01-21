@@ -34,18 +34,8 @@ impl CSVData {
         let raw_rows: Vec<String> = {
             let raw_text = std::fs::read_to_string(path)
                 .map_err(|e| format!("Unable to open file {:?}: {}", path, e))?;
-            raw_text
-                .split('\n')
-                .map(|row| {
-                    let row = row.to_owned();
-                    // Remove surrounding whitespace.
-                    row.trim();
-                    row
-                })
-                .collect()
+            raw_text.lines().map(|row| row.trim().to_owned()).collect()
         };
-        // DEBUG OK
-        dbg!(raw_rows.get(0));
 
         // Try to determine comment character.
         //
@@ -192,8 +182,7 @@ impl CSVData {
         let mut columns: Vec<Vec<f64>> = (0..num_columns).map(|_| Vec::new()).collect();
         let mut row_buffer: Vec<f64> = vec![0.0; num_columns];
         let mut num_ignored = 0;
-        'outer: for (i, row) in raw_rows.iter().enumerate() {
-            log::debug!("parse row '{}'", &row);
+        for (i, row) in raw_rows.iter().enumerate() {
             // Skip rows starting with comment char or non-digit, as well as
             // empty rows.
             if let Some(first_char) = row.chars().nth(0) {
@@ -210,7 +199,6 @@ impl CSVData {
                     Ok(num) => row_buffer[j] = num,
                     Err(e) => {
                         log::debug!("failed to parse row {i} entry {j}: {e}");
-                        break 'outer;
                         // If we cannot parse an entry, we ignore the entire row.
                         num_ignored += 1;
                         continue;
@@ -220,10 +208,6 @@ impl CSVData {
             for (i, num) in row_buffer.iter().enumerate() {
                 columns[i].push(*num);
             }
-        }
-
-        for i in 0..num_columns {
-            dbg!(&columns[i][0]);
         }
 
         log::debug!(
@@ -239,9 +223,6 @@ impl CSVData {
             CSVCache::new(&columns, None, 0)
                 .ok_or(format!("unable to load cache for {:?}", path))?
         };
-
-        // DEBUG
-        // std::thread::sleep_ms(10000);
 
         Ok(CSVData {
             columns,

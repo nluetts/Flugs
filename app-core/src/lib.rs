@@ -2,6 +2,8 @@
 
 pub mod backend;
 pub mod frontend;
+pub mod storage;
+pub mod string_error;
 
 pub const BACKEND_HUNG_UP_MSG: &str = "backend thread hung up unexpectedly";
 

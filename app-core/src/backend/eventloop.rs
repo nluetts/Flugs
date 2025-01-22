@@ -19,9 +19,8 @@ impl<S: BackendState + Send + 'static> BackendEventLoop<S> {
     pub fn update(&mut self) -> bool {
         // handle the most important command
         while let Ok(request) = self.request_rx.try_recv() {
-            log::debug!("handeling request '{}' ...", request.describe());
             request.run_on_backend(self);
-            log::debug!("... finished.")
+            log::debug!("handled request '{}'", request.describe());
         }
         self.should_stop
     }

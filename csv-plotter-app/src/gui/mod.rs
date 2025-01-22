@@ -1,9 +1,12 @@
 mod components;
+mod storage;
 
 use self::components::{Plotter, Search};
 use crate::BackendAppState;
 use crate::ROOT_PATH;
 use app_core::backend::BackendRequest;
+use storage::load_json;
+use storage::save_json;
 
 pub use crate::gui::components::{FileHandler, GroupID};
 
@@ -122,6 +125,18 @@ impl EguiApp {
                 ui.menu_button("File", |ui| {
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                    if ui.button("Save State").clicked() {
+                        // TODO: do this on the backend thread?
+                        if let Err(error) = save_json(self) {
+                            log::error!("{}", error)
+                        };
+                    }
+                    if ui.button("Load State").clicked() {
+                        // TODO: do this on the backend thread?
+                        if let Err(error) = load_json(self) {
+                            log::error!("{}", error)
+                        };
                     }
                 });
 

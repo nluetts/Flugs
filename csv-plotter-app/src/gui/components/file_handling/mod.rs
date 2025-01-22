@@ -43,6 +43,15 @@ pub struct Group {
 )]
 pub struct GroupID(usize);
 
+impl File {
+    pub fn file_name(&self) -> &str {
+        self.path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unreadable filename")
+    }
+}
+
 impl GroupID {
     pub fn new(id: usize) -> Self {
         GroupID(id)

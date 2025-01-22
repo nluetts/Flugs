@@ -130,9 +130,13 @@ impl eframe::App for EguiApp {
 
 impl EguiApp {
     fn central_panel(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-            ui.heading("PlotMe CSV Plotter")
-        });
+        ui.with_layout(
+            egui::Layout::right_to_left(egui::Align::Min),
+            |ui| match self.ui_selection {
+                U::Plot => ui.heading("Plots"),
+                U::FileSettings => ui.heading("Groups and Files"),
+            },
+        );
 
         let search_results = self.search.render(&mut self.request_tx, ui, ctx);
         let num_results = search_results.len();

@@ -98,14 +98,9 @@ impl FileHandler {
         let mut item_was_removed = false;
 
         for (gid, fid) in files_to_delete {
+            let file_name = self.fid_to_filename_str(&fid).to_string();
             if let Some(grp) = self.groups.get_mut(&gid) {
                 grp.file_ids.remove(&fid);
-                let file_name = self
-                    .registry
-                    .get(&fid)
-                    .and_then(|file| file.path.file_name())
-                    .and_then(|name| name.to_str())
-                    .unwrap_or("unreadable filename");
                 log::debug!(
                     "removed file '{file_name}' from group {} with ID {gid:?}",
                     grp.name
@@ -139,13 +134,10 @@ impl FileHandler {
             }
         }
         for fid in mark_delete.into_iter() {
-            let file_name = self
-                .registry
-                .get(&fid)
-                .and_then(|file| file.path.file_name())
-                .and_then(|name| name.to_str())
-                .unwrap_or("unreadable filename");
-            log::debug!("remove file '{file_name}' from registry");
+            log::debug!(
+                "remove file '{}' from registry",
+                self.fid_to_filename_str(&fid)
+            );
             self.registry.remove(&fid);
         }
     }
@@ -158,6 +150,13 @@ impl FileHandler {
         let fid = self.next_id;
         self.next_id.0 += 1;
         fid
+    }
+
+    fn fid_to_filename_str(&self, fid: &FileID) -> &str {
+        self.registry
+            .get(&fid)
+            .map(|file| file.file_name())
+            .unwrap_or("unreadable filename")
     }
 
     pub fn try_update(&mut self) {

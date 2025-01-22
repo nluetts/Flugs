@@ -1,4 +1,4 @@
-use crate::gui::components::FileHandler;
+use crate::gui::components::{File, FileHandler};
 
 impl super::Plotter {
     pub fn render(
@@ -14,15 +14,20 @@ impl super::Plotter {
                     file_handler
                         .registry
                         .get(fid)
-                        .and_then(|file| file.get_cache())
-                        .map(|dat| self.plot(dat, plot_ui));
+                        .map(|file| self.plot(file, plot_ui));
                 }
             }
         });
     }
 
-    fn plot(&self, data: &Vec<[f64; 2]>, plot_iu: &mut egui_plot::PlotUi) {
-        // log::debug!("first data point: {:?}", data[0]);
-        plot_iu.line(egui_plot::Line::new(data.to_owned()));
+    fn plot(&self, file: &File, plot_iu: &mut egui_plot::PlotUi) {
+        if let Some(data) = file.get_cache() {
+            plot_iu.line(egui_plot::Line::new(data.to_owned()));
+        } else {
+            log::warn!(
+                "unable to get cache for plotting for file '{}'",
+                file.file_name()
+            )
+        }
     }
 }

@@ -1,13 +1,16 @@
 mod logic;
 mod ui;
 
-use std::collections::HashSet;
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use crate::backend_state::CSVData;
 use app_core::frontend::UIParameter;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
+)]
 pub struct FileID(usize);
 
 #[derive(Default, Debug)]
@@ -19,11 +22,15 @@ pub struct FileHandler {
 
 #[derive(Debug)]
 pub struct File {
-    path: PathBuf,
     csv_data: UIParameter<Result<CSVData, String>>,
+    pub path: PathBuf,
+    pub properties: FileProperties,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FileProperties {}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Group {
     pub file_ids: HashSet<FileID>,
     pub is_plotted: bool,
@@ -31,7 +38,9 @@ pub struct Group {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(
+    Clone, Copy, Debug, Default, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
+)]
 pub struct GroupID(usize);
 
 impl GroupID {
@@ -41,13 +50,5 @@ impl GroupID {
 
     pub fn id(&self) -> usize {
         self.0
-    }
-}
-
-impl FileID {
-    fn next(&mut self) -> FileID {
-        let id = self.clone();
-        self.0 += 1;
-        id
     }
 }

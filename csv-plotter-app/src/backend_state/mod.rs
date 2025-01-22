@@ -13,7 +13,6 @@ pub use csv::CSVData;
 pub struct BackendAppState {
     search_path: PathBuf,
     child_paths_unfiltered: Vec<PathBuf>,
-    _id_counter: usize,
 }
 
 impl BackendState for BackendAppState {}
@@ -23,7 +22,6 @@ impl BackendAppState {
         Self {
             search_path,
             child_paths_unfiltered: Vec::new(),
-            _id_counter: 0,
         }
     }
 }
@@ -32,7 +30,7 @@ impl BackendAppState {
 impl BackendAppState {
     /// Update the subpaths of the path which is currently selected
     /// (`current_path`)
-    pub fn update_child_paths_unfiltered(&mut self) {
+    fn update_child_paths_unfiltered(&mut self) {
         let mut file_paths = Vec::new();
         let mut dirs = vec![self.search_path.to_path_buf()];
 
@@ -64,6 +62,8 @@ impl BackendAppState {
 
     pub fn set_search_path(&mut self, new_path: &Path) {
         self.search_path = new_path.to_path_buf();
+        // update index of files/paths
+        self.update_child_paths_unfiltered();
     }
 
     /// Return the best file path matches for `query`, together with the
@@ -96,9 +96,5 @@ impl BackendAppState {
             .take(10)
             .filter_map(query_indices)
             .collect()
-    }
-
-    pub fn load_file(&self, path: &PathBuf) -> PathBuf {
-        path.to_owned()
     }
 }

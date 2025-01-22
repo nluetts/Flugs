@@ -17,8 +17,6 @@ impl super::Search {
             "request child paths",
             move |b: &mut BackendEventLoop<BackendAppState>| {
                 b.state.set_search_path(&new_path);
-                // update index of files/paths
-                b.state.update_child_paths_unfiltered();
                 b.state.get_search_path()
             },
             request_tx,

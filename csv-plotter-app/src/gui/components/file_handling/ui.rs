@@ -9,13 +9,23 @@ impl FileHandler {
         ui: &mut egui::Ui,
         _ctx: &egui::Context,
     ) {
-        let mut mark_delete = Vec::new();
-        for (gid, grp) in self.groups.iter_mut() {
+        let mut mark_delete_files = Vec::new();
+        let mut mark_delete_groups = Vec::new();
+
+        let mut group_ids: Vec<_> = self.groups.keys().cloned().collect();
+        group_ids.sort();
+        for gid in group_ids {
+            // Unwrapping is save here, because `group_ids` can only contain
+            // valid keys.
+            let grp = self.groups.get_mut(&gid).unwrap();
             ui.heading(&grp.name);
             ui.horizontal(|ui| {
                 let lab = ui.label("rename:");
                 ui.text_edit_singleline(&mut grp.name).labelled_by(lab.id);
-                ui.checkbox(&mut grp.is_plotted, "plot?");
+                ui.toggle_value(&mut grp.is_plotted, "plot?");
+                if ui.small_button("🗑").clicked() {
+                    mark_delete_groups.push(gid.clone());
+                }
             });
             for fid in grp.file_ids.iter() {
                 if let Some(file) = self.registry.get_mut(fid) {
@@ -30,8 +40,7 @@ impl FileHandler {
                         ui.label(file_name);
                         ui.label(format!("(ID {})", fid.0));
                         if ui.small_button("🗑").clicked() {
-                            log::debug!("mark '{file_name}' delete");
-                            mark_delete.push((gid.clone(), fid.clone()));
+                            mark_delete_files.push((gid.clone(), fid.clone()));
                         }
                     });
                     if let Err(error) = file.csv_data.value() {
@@ -48,6 +57,6 @@ impl FileHandler {
             }
             ui.separator();
         }
-        self.remove(mark_delete);
+        self.remove(mark_delete_groups, mark_delete_files);
     }
 }

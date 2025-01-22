@@ -1,5 +1,5 @@
 mod components;
-mod storage;
+pub mod storage;
 
 use self::components::{Plotter, Search};
 use crate::BackendAppState;
@@ -11,6 +11,7 @@ use storage::save_json;
 pub use crate::gui::components::{FileHandler, GroupID};
 
 use std::path::PathBuf;
+use std::time::Duration;
 use std::{sync::mpsc::Sender, thread::JoinHandle};
 
 pub type DynRequestSender = Sender<Box<dyn BackendRequest<BackendAppState>>>;
@@ -71,12 +72,42 @@ impl EguiApp {
 
 impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.request_repaint_after(Duration::from_millis(50));
         self.update_state();
 
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            if ctx.input(|i| i.key_pressed(egui::Key::F3)) {
+        let mut should_quit = false;
+
+        // Handle keyboard input.
+        ctx.input(|i| {
+            // Help window.
+            if i.key_pressed(egui::Key::F1) {
+                self.shortcuts_modal_open = !self.shortcuts_modal_open;
+            }
+            // Circle main window.
+            if i.key_pressed(egui::Key::F3) {
                 self.ui_selection = self.ui_selection.next();
             }
+            // Quick save app state.
+            if i.key_pressed(egui::Key::F5) {
+                if let Err(error) = save_json(self) {
+                    log::error!("{}", error)
+                };
+            }
+            // Quick load app state.
+            if i.key_pressed(egui::Key::F6) {
+                if let Err(error) = load_json(self) {
+                    log::error!("{}", error)
+                };
+            }
+            // Close app.
+            if i.key_pressed(egui::Key::F10) {
+                // Quitting cannot be requested from within here, the UI stops,
+                // but not the backend thread.
+                should_quit = true;
+            }
+        });
+
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             self.render_shortcut_modal(ctx);
             self.menu(ui, ctx);
         });
@@ -84,6 +115,10 @@ impl eframe::App for EguiApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.central_panel(ui, ctx);
         });
+
+        if should_quit {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
@@ -123,20 +158,21 @@ impl EguiApp {
         egui::menu::bar(ui, |ui| {
             {
                 ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                    }
-                    if ui.button("Save State").clicked() {
-                        // TODO: do this on the backend thread?
+                    if ui.button("Quick Save (F5)").clicked() {
                         if let Err(error) = save_json(self) {
                             log::error!("{}", error)
                         };
                     }
-                    if ui.button("Load State").clicked() {
-                        // TODO: do this on the backend thread?
+                    if ui.button("Quick Load (F6)").clicked() {
+                        // We can do the loading on the main thread, because
+                        // files (the only thing that takes time) are loaded on
+                        // the backend anyway.
                         if let Err(error) = load_json(self) {
                             log::error!("{}", error)
                         };
+                    }
+                    if ui.button("Quit").clicked() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 });
 
@@ -160,19 +196,23 @@ impl EguiApp {
     }
 
     fn render_shortcut_modal(&mut self, ctx: &egui::Context) {
-        if ctx.input(|i| i.key_pressed(egui::Key::F1)) {
-            self.shortcuts_modal_open = !self.shortcuts_modal_open;
-        }
         if self.shortcuts_modal_open
             && egui::Modal::new("shortcut_modal".into())
                 .show(ctx, |ui| {
                     ui.heading("Keyboard Shortcuts");
                     ui.separator();
+                    ui.label("CTRL + Space = Open Search Menu");
+                    ui.separator();
                     ui.label("F1 = Show Keyboard Shortcuts");
                     ui.separator();
                     ui.label("F3 = Cycle View");
                     ui.separator();
-                    ui.label("CTRL + Space = Open Search Menu");
+                    ui.label("F5 = Save App State");
+                    ui.separator();
+                    ui.label("F6 = Load App State");
+                    ui.separator();
+                    ui.label("F10 = Quit App");
+                    ui.separator();
                 })
                 .should_close()
         {

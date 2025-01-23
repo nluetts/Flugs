@@ -1,4 +1,4 @@
-use crate::gui::components::{File, FileHandler};
+use crate::app::components::{File, FileHandler};
 
 impl super::Plotter {
     pub fn render(

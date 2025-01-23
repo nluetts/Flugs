@@ -1,4 +1,4 @@
-use crate::gui::DynRequestSender;
+use crate::app::DynRequestSender;
 
 use super::FileHandler;
 

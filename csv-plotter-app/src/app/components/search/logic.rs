@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use app_core::backend::{BackendEventLoop, BackendLink};
 
-use crate::{gui::DynRequestSender, BackendAppState};
+use crate::{app::DynRequestSender, BackendAppState};
 
 impl super::Search {
     pub fn try_update(&mut self) {

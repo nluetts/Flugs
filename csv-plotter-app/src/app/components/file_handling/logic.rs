@@ -9,7 +9,7 @@ use app_core::{
     BACKEND_HUNG_UP_MSG,
 };
 
-use crate::{backend_state::CSVData, gui::DynRequestSender, BackendAppState};
+use crate::{app::DynRequestSender, backend_state::CSVData, BackendAppState};
 
 use super::{File, FileHandler, FileID, FileProperties, Group, GroupID};
 

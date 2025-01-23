@@ -1,6 +1,6 @@
 mod csv;
 
-use crate::gui::GroupID;
+use crate::app::GroupID;
 use app_core::backend::BackendState;
 use std::{
     collections::HashSet,

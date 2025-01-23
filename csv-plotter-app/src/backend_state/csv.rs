@@ -238,18 +238,14 @@ impl CSVData {
 }
 
 impl CSVCache {
-    fn new(columns: &Vec<Vec<f64>>, xcol: Option<usize>, ycol: usize) -> Option<Self> {
+    fn new(columns: &[Vec<f64>], xcol: Option<usize>, ycol: usize) -> Option<Self> {
         let ydata = columns.get(ycol)?;
         let data = if let Some(xdata) = xcol.map(|i| columns.get(i))? {
-            ydata
-                .into_iter()
-                .zip(xdata.into_iter())
-                .map(|(y, x)| [*x, *y])
-                .collect()
+            ydata.iter().zip(xdata).map(|(y, x)| [*x, *y]).collect()
         } else {
             let n = ydata.len();
             ydata
-                .into_iter()
+                .iter()
                 .zip(0..n)
                 .map(|(y, n)| [n as f64, *y])
                 .collect()

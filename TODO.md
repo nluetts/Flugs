@@ -4,7 +4,7 @@ UI:
 - [ ] Include legend showing filename or alias
 - [ ] Select good colors for plots based on FileID
 - [ ] Implement file setting form
-  - [ ] Use collapsing header for file settings form
+  - [x] ~~Use collapsing header for file settings form~~
   - [ ] Allow alias for file
   - [ ] Allow selection of plot color
   - [ ] Implement scaling/shifting of plots (form based and mouse control)

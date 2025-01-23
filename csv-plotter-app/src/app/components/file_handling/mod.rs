@@ -29,8 +29,10 @@ pub struct File {
     pub properties: FileProperties,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct FileProperties {}
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct FileProperties {
+    pub alias: String,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Group {

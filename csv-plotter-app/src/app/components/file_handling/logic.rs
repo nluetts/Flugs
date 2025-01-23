@@ -52,7 +52,7 @@ impl FileHandler {
                     File {
                         path: search_path.join(fp),
                         csv_data,
-                        properties: super::FileProperties {},
+                        properties: super::FileProperties::default(),
                     },
                 );
                 fid

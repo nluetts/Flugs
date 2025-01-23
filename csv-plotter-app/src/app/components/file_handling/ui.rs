@@ -24,10 +24,16 @@ impl FileHandler {
             .enumerate()
             .filter_map(|(id, x)| Some(id).zip(x.as_mut()))
         {
-            // Unwrapping is save here, because `group_ids` can only contain
-            // valid keys.
+            ui.heading(&grp.name);
+            ui.horizontal(|ui| {
+                let lab = ui.label("rename:");
+                ui.text_edit_singleline(&mut grp.name).labelled_by(lab.id);
+                if ui.small_button("🗑").clicked() {
+                    mark_delete_groups.push(gid);
+                }
+            });
             let grp_label_txt = LayoutJob::simple_singleline(
-                format!("Group \"{}\"", grp.name),
+                format!("Files in Group {}", grp.name),
                 FontId::proportional(15.0),
                 if ctx.theme() == egui::Theme::Light {
                     Color32::BLACK
@@ -35,15 +41,10 @@ impl FileHandler {
                     Color32::WHITE
                 },
             );
-            let collapsing = egui::CollapsingHeader::new(grp_label_txt).id_salt((&grp.name, gid));
+            let collapsing = egui::CollapsingHeader::new(grp_label_txt)
+                .id_salt((&grp.name, gid))
+                .default_open(true);
             collapsing.show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    let lab = ui.label("rename:");
-                    ui.text_edit_singleline(&mut grp.name).labelled_by(lab.id);
-                    if ui.small_button("🗑").clicked() {
-                        mark_delete_groups.push(gid);
-                    }
-                });
                 for fid in grp.file_ids.iter() {
                     if let Some(file) = self.registry.get_mut(fid) {
                         render_file_form(ui, fid, file, gid, &mut mark_delete_files);
@@ -88,15 +89,14 @@ fn render_file_form(
             if let Err(error) = file.csv_data.value() {
                 ui.label(error).highlight();
             };
+            ui.horizontal(|ui| {
+                ui.label("alias: ");
+                ui.text_edit_singleline(&mut file.properties.alias)
+            });
         });
         ui.label(format!("(ID {})", fid.0));
         if ui.small_button("🗑").clicked() {
             mark_delete_files.push((gid, *fid));
         }
-    });
-    ui.horizontal(|_ui| {
-        // TODO move on developing UI
-        // let xcol_sel = egui::ComboBox::from_label(file_name);
-        // if file.csv_data.value().cache()
     });
 }

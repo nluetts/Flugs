@@ -34,20 +34,25 @@ impl super::Plotter {
                             .get(fid)
                             .filter(|file| file.get_cache().is_some())
                         {
-                            self.plot(fid, file, plot_ui)
+                            self.plot(fid, file, &grp.name, plot_ui)
                         }
                     }
                 }
             });
     }
 
-    fn plot(&self, fid: &FileID, file: &File, plot_iu: &mut egui_plot::PlotUi) {
+    fn plot(&self, fid: &FileID, file: &File, group_name: &str, plot_iu: &mut egui_plot::PlotUi) {
         if let Some(data) = file.get_cache() {
             let color = auto_color(Into::<i32>::into(*fid));
+            let name = if file.properties.alias.is_empty() {
+                format!("{} ({})", file.file_name(), group_name)
+            } else {
+                format!("{} ({})", file.properties.alias, group_name)
+            };
             plot_iu.line(
                 egui_plot::Line::new(data.to_owned())
                     .color(color)
-                    .name(file.file_name()),
+                    .name(name),
             );
         } else {
             // This should never happen because if the filter applied in

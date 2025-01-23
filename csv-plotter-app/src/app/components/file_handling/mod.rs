@@ -29,16 +29,18 @@ pub struct File {
     pub properties: FileProperties,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FileProperties {
     pub alias: String,
+    pub xoffset: f64,
+    pub yoffset: f64,
+    pub yscale: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Group {
     pub file_ids: HashSet<FileID>,
     pub is_plotted: bool,
-    // _id: GroupID,
     pub name: String,
 }
 
@@ -78,8 +80,19 @@ impl File {
     }
 }
 
-impl Into<i32> for FileID {
-    fn into(self) -> i32 {
-        self.0 as i32
+impl Default for FileProperties {
+    fn default() -> Self {
+        Self {
+            alias: String::new(),
+            xoffset: 0.0,
+            yoffset: 0.0,
+            yscale: 1.0,
+        }
+    }
+}
+
+impl From<FileID> for i32 {
+    fn from(val: FileID) -> Self {
+        val.0 as i32
     }
 }

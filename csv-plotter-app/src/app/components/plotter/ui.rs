@@ -7,7 +7,7 @@ impl super::Plotter {
         &mut self,
         file_handler: &mut FileHandler,
         ui: &mut egui::Ui,
-        _ctx: &egui::Context,
+        ctx: &egui::Context,
     ) {
         // Horizontal stripe of switch buttons enabeling/disabeling groups
         ui.horizontal(|ui| {
@@ -16,7 +16,14 @@ impl super::Plotter {
             }
         });
 
-        egui_plot::Plot::new("Plot")
+        // Get modifier input (we need this here already, to disallow the plot
+        // to be panned).
+        let modifiers = ctx.input(|i| [i.modifiers.alt, i.modifiers.ctrl, i.modifiers.shift]);
+        let modifier_down = modifiers.iter().any(|x| *x);
+
+        self.files_plot_ids.drain();
+        let response = egui_plot::Plot::new("Plot")
+            .allow_drag(!modifier_down)
             .legend(Legend::default())
             .show(ui, |plot_ui| {
                 for (_, grp) in file_handler
@@ -34,26 +41,57 @@ impl super::Plotter {
                             .get(fid)
                             .filter(|file| file.get_cache().is_some())
                         {
-                            self.plot(fid, file, &grp.name, plot_ui)
+                            let egui_id = self.plot(fid, file, &grp.name, plot_ui);
+                            self.files_plot_ids.insert((egui_id, *fid));
                         }
                     }
                 }
             });
+        if let Some(hovered_item_id) = response.hovered_plot_item {
+            let should_modify =
+                modifier_down && ctx.input(|i| i.pointer.is_moving() && i.pointer.primary_down());
+
+            if should_modify {
+                self.manipulate_plots(hovered_item_id, file_handler, modifiers, ctx);
+            }
+        }
     }
 
-    fn plot(&self, fid: &FileID, file: &File, group_name: &str, plot_iu: &mut egui_plot::PlotUi) {
+    fn plot(
+        &self,
+        fid: &FileID,
+        file: &File,
+        group_name: &str,
+        plot_iu: &mut egui_plot::PlotUi,
+    ) -> egui::Id {
         if let Some(data) = file.get_cache() {
+            // Apply custom shifting/scaling to data.
+            let data: Vec<[f64; 2]> = data
+                .iter()
+                .map(|[x, y]| {
+                    [
+                        x + file.properties.xoffset,
+                        y * file.properties.yscale + file.properties.yoffset,
+                    ]
+                })
+                .collect();
+
+            // Plot the data.
             let color = auto_color(Into::<i32>::into(*fid));
             let name = if file.properties.alias.is_empty() {
                 format!("{} ({})", file.file_name(), group_name)
             } else {
                 format!("{} ({})", file.properties.alias, group_name)
             };
+            let egui_id = name.clone().into();
             plot_iu.line(
                 egui_plot::Line::new(data.to_owned())
                     .color(color)
-                    .name(name),
+                    .name(name)
+                    .id(egui_id),
             );
+
+            egui_id
         } else {
             // This should never happen because if the filter applied in
             // `Plotter::render`.

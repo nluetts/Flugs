@@ -9,7 +9,7 @@ UI:
   - [x] ~~Use collapsing header for file settings form~~
   - [x] ~~Allow alias for file~~
   - [ ] Allow selection of plot color
-  - [ ] Implement scaling/shifting of plots (form based and mouse control)
+  - [x] ~~Implement scaling/shifting of plots (form based and mouse control)~~
   - [ ] Implement plotting of columns different than first two
     - [ ] Allow plotting more than one dataset from CSV file
 - [ ] Create Global Settings View
@@ -30,3 +30,7 @@ Internals:
 - [ ] Handle all UI interactions using an event system?
 - [ ] Remove hard coded paths
   - [ ] Work with configuration file
+
+BUGS:
+- [ ] Removing one file from group may may delete all files
+- [ ] CSV parsing can panic

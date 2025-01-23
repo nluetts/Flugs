@@ -54,15 +54,15 @@ impl super::Search {
                             .clicked()
                         {
                             let new_path = self.search_path.value_mut().clone();
-                            self.set_search_path(&new_path, request_tx);
+                            self.set_search_path(&new_path);
                         }
                         if ui
                             .small_button("...")
                             .on_hover_text("change search path")
                             .clicked()
                         {
-                            let new_path = rfd::FileDialog::new().pick_folder().unwrap_or_default();
-                            self.set_search_path(&new_path, request_tx);
+                            self.awaiting_search_path_selection =
+                                Some(std::thread::spawn(|| rfd::FileDialog::new().pick_folder()));
                         }
                     })
                 });

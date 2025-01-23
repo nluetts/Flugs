@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use app_core::backend::{BackendEventLoop, BackendLink};
 
@@ -8,9 +8,19 @@ impl super::Search {
     pub fn try_update(&mut self) {
         self.search_path.try_update();
         self.matched_paths.try_update();
+        if let Some(handle) = self
+            .awaiting_search_path_selection
+            .take_if(|handle| handle.is_finished())
+        {
+            match handle.join() {
+                Ok(Some(path)) => self.set_search_path(&path),
+                Ok(None) => (),
+                Err(err) => log::error!("Unable to set new search directory: {:?}", err),
+            }
+        }
     }
 
-    pub fn set_search_path(&mut self, path: &PathBuf, request_tx: &mut DynRequestSender) {
+    pub fn set_search_path(&mut self, path: &Path) {
         let new_path = path.to_owned();
         BackendLink::request_parameter_update(
             &mut self.search_path,
@@ -19,7 +29,7 @@ impl super::Search {
                 b.state.set_search_path(&new_path);
                 b.state.get_search_path()
             },
-            request_tx,
+            &mut self.request_tx,
         );
     }
 

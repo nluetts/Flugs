@@ -1,11 +1,11 @@
 UI:
 - [x] ~~Implement plotting/hiding of groups accessible with switch
       buttons on plotting UI~~
-- [ ] Allow alias for file
 - [ ] Include legend showing filename or alias
 - [ ] Select good colors for plots based on FileID
-- [ ] Implement file setting formular
-  - [ ] Use collapsing header for  
+- [ ] Implement file setting form
+  - [ ] Use collapsing header for file settings form
+  - [ ] Allow alias for file
   - [ ] Allow selection of plot color
   - [ ] Implement scaling/shifting of plots (form based and mouse control)
   - [ ] Implement plotting of columns different than first two
@@ -21,4 +21,5 @@ Search:
 Global:
 - [ ] Use array of length 10 for groups
 - [ ] Handle all UI interactions using an event system?
+- [ ] Include error log window 
  

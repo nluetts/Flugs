@@ -23,11 +23,13 @@ impl super::Plotter {
         Plot::new("Plot").show(ui, |plot_ui| {
             for (_, gid) in file_handler.groups.iter().filter(|(_, grp)| grp.is_plotted) {
                 for fid in gid.file_ids.iter() {
-                    file_handler
+                    if let Some(file) = file_handler
                         .registry
                         .get(fid)
                         .filter(|file| file.get_cache().is_some())
-                        .map(|file| self.plot(file, plot_ui));
+                    {
+                        self.plot(file, plot_ui)
+                    }
                 }
             }
         });

@@ -44,14 +44,14 @@ impl UISelection {
 impl EguiApp {
     pub fn new(
         _cc: &eframe::CreationContext<'_>,
-        mut request_tx: Sender<Box<dyn BackendRequest<BackendAppState>>>,
+        request_tx: Sender<Box<dyn BackendRequest<BackendAppState>>>,
         backend_thread_handle: JoinHandle<()>,
     ) -> Self {
         // initialize search component with root path and index
         // subpaths
-        let mut search = Search::default();
+        let mut search = Search::new(request_tx.clone());
         let search_path = PathBuf::from(ROOT_PATH);
-        search.set_search_path(&search_path, &mut request_tx);
+        search.set_search_path(&search_path);
 
         Self {
             backend_thread_handle: Some(backend_thread_handle),

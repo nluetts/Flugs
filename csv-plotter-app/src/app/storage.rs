@@ -55,8 +55,7 @@ pub fn load_json(app: &mut EguiApp) -> Result<(), String> {
         frontend_storage,
     } = Storage::from_json()?;
 
-    app.search
-        .set_search_path(&frontend_storage.search_path, &mut app.request_tx);
+    app.search.set_search_path(&frontend_storage.search_path);
     app.file_handler.groups = frontend_storage.groups;
     app.file_handler.registry = frontend_storage
         .registry

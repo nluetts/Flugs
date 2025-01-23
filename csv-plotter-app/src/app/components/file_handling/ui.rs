@@ -28,7 +28,7 @@ impl FileHandler {
                 ui.text_edit_singleline(&mut grp.name).labelled_by(lab.id);
                 ui.toggle_value(&mut grp.is_plotted, "plot?");
                 if ui.small_button("🗑").clicked() {
-                    mark_delete_groups.push(gid.clone());
+                    mark_delete_groups.push(gid);
                 }
             });
             for fid in grp.file_ids.iter() {
@@ -44,7 +44,7 @@ impl FileHandler {
                         ui.label(file_name);
                         ui.label(format!("(ID {})", fid.0));
                         if ui.small_button("🗑").clicked() {
-                            mark_delete_files.push((gid.clone(), fid.clone()));
+                            mark_delete_files.push((gid, *fid));
                         }
                     });
                     if let Err(error) = file.csv_data.value() {

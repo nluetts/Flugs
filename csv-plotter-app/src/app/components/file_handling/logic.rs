@@ -50,8 +50,7 @@ impl FileHandler {
             let fid = if let Some((fid, _)) = self
                 .registry
                 .iter()
-                .filter(|(_, file)| file.path == search_path.join(&fp))
-                .next()
+                .find(|(_, file)| file.path == search_path.join(&fp))
             {
                 *fid
             } else {
@@ -78,7 +77,7 @@ impl FileHandler {
                 new_file_id_set.insert(fid);
                 let name = format!("Group ({})", gid.0);
                 self.groups.insert(
-                    gid.clone(),
+                    gid,
                     Group {
                         file_ids: new_file_id_set,
                         is_plotted: false,
@@ -129,7 +128,7 @@ impl FileHandler {
         // Remove files from registry which are not member of any group.
         let mut mark_delete = Vec::new();
         for fid in self.registry.keys() {
-            if !self.groups.values().any(|grp| grp.file_ids.contains(&fid)) {
+            if !self.groups.values().any(|grp| grp.file_ids.contains(fid)) {
                 mark_delete.push(*fid);
             }
         }
@@ -154,7 +153,7 @@ impl FileHandler {
 
     fn fid_to_filename_str(&self, fid: &FileID) -> &str {
         self.registry
-            .get(&fid)
+            .get(fid)
             .map(|file| file.file_name())
             .unwrap_or("unreadable filename")
     }

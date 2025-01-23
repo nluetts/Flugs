@@ -5,7 +5,7 @@ use std::{
 
 use egui::{text::LayoutJob, Color32, FontId, InputState, Label, Pos2, TextFormat};
 
-use crate::{app::components::GroupID, app::DynRequestSender};
+use crate::app::DynRequestSender;
 
 impl super::Search {
     pub fn render(
@@ -13,7 +13,7 @@ impl super::Search {
         request_tx: &mut DynRequestSender,
         _ui: &mut egui::Ui,
         ctx: &egui::Context,
-    ) -> HashSet<(PathBuf, GroupID)> {
+    ) -> HashSet<(PathBuf, usize)> {
         let mut popup_opened_this_frame = false;
         // sense if search shortcut was pressed
         if ctx.input(|i| i.modifiers.command && i.key_released(egui::Key::Space)) {
@@ -61,6 +61,7 @@ impl super::Search {
                             .on_hover_text("change search path")
                             .clicked()
                         {
+                            log::debug!("open dialog to select new search path");
                             self.awaiting_search_path_selection =
                                 Some(std::thread::spawn(|| rfd::FileDialog::new().pick_folder()));
                         }
@@ -95,7 +96,7 @@ impl super::Search {
 
         if ctx.input(|i| i.key_released(egui::Key::Enter)) {
             self.popup_shown = false;
-            let to_load: HashSet<(PathBuf, GroupID)> = self
+            let to_load: HashSet<(PathBuf, usize)> = self
                 .matched_paths
                 .value_mut()
                 .drain(..)
@@ -138,17 +139,17 @@ impl super::Search {
                             (false, Some(released_num)) => {
                                 // TODO: I bet there is an easier way:
                                 if let Some(gid) = group_id.take() {
-                                    if released_num != gid.id() {
-                                        group_id.replace(GroupID::new(released_num));
+                                    if released_num != gid {
+                                        group_id.replace(released_num);
                                     }
                                 } else {
-                                    group_id.replace(GroupID::new(released_num));
+                                    group_id.replace(released_num);
                                 }
                             }
                         }
                     }
                     if let Some(grp) = group_id {
-                        let text = format!("({})", grp.id());
+                        let text = format!("({})", grp);
                         let text = LayoutJob::simple(text, FontId::default(), Color32::RED, 5.0);
                         ui.add(Label::new(text));
                     }

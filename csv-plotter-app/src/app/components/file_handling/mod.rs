@@ -15,7 +15,7 @@ pub struct FileID(usize);
 
 #[derive(Default, Debug)]
 pub struct FileHandler {
-    pub groups: HashMap<GroupID, Group>,
+    pub groups: [Option<Group>; 10],
     pub registry: HashMap<FileID, File>,
     next_id: FileID,
 }
@@ -34,14 +34,9 @@ pub struct FileProperties {}
 pub struct Group {
     pub file_ids: HashSet<FileID>,
     pub is_plotted: bool,
-    _id: GroupID,
+    // _id: GroupID,
     pub name: String,
 }
-
-#[derive(
-    Clone, Copy, Debug, Default, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
-)]
-pub struct GroupID(usize);
 
 impl File {
     pub fn file_name(&self) -> &str {
@@ -49,15 +44,5 @@ impl File {
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or("unreadable filename")
-    }
-}
-
-impl GroupID {
-    pub fn new(id: usize) -> Self {
-        GroupID(id)
-    }
-
-    pub fn id(&self) -> usize {
-        self.0
     }
 }

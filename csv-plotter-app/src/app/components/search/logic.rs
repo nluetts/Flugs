@@ -12,6 +12,7 @@ impl super::Search {
             .awaiting_search_path_selection
             .take_if(|handle| handle.is_finished())
         {
+            log::debug!("receiving new search path");
             match handle.join() {
                 Ok(Some(path)) => self.set_search_path(&path),
                 Ok(None) => (),

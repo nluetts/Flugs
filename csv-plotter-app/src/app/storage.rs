@@ -5,10 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::EguiApp;
 
-use super::{
-    components::{File, FileID, FileProperties, Group},
-    GroupID,
-};
+use super::components::{File, FileID, FileProperties, Group};
 
 // Currently not used, since the only backend state to safe right now is the
 // search path, which is also mirrored in the frontend (app.search).
@@ -18,7 +15,7 @@ struct BackendStorage {}
 #[derive(Serialize, Deserialize)]
 struct FrontendStorage {
     search_path: PathBuf,
-    groups: HashMap<GroupID, Group>,
+    groups: [Option<Group>; 10],
     registry: HashMap<FileID, FileStorage>,
     next_id: FileID,
 }

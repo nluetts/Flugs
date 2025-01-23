@@ -1,7 +1,4 @@
-use crate::app::{
-    components::{File, FileHandler},
-    GroupID,
-};
+use crate::app::components::{File, FileHandler};
 
 impl super::Plotter {
     pub fn render(
@@ -12,17 +9,23 @@ impl super::Plotter {
     ) {
         // Horizontal stripe of switch buttons enabeling/disabeling groups
         ui.horizontal(|ui| {
-            for id in 0..10 {
-                if let Some(grp) = file_handler.groups.get_mut(&GroupID::new(id)) {
-                    ui.toggle_value(&mut grp.is_plotted, &grp.name);
-                }
+            for grp in file_handler.groups.iter_mut().filter_map(|x| x.as_mut()) {
+                ui.toggle_value(&mut grp.is_plotted, &grp.name);
             }
         });
 
         use egui_plot::Plot;
         Plot::new("Plot").show(ui, |plot_ui| {
-            for (_, gid) in file_handler.groups.iter().filter(|(_, grp)| grp.is_plotted) {
-                for fid in gid.file_ids.iter() {
+            for (_, grp) in file_handler
+                .groups
+                .iter_mut()
+                .enumerate()
+                .filter_map(|(id, x)| Some(id).zip(x.as_mut()))
+            {
+                if !grp.is_plotted {
+                    continue;
+                }
+                for fid in grp.file_ids.iter() {
                     if let Some(file) = file_handler
                         .registry
                         .get(fid)

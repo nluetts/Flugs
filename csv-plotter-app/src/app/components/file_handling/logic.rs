@@ -11,7 +11,7 @@ use app_core::{
 
 use crate::{app::DynRequestSender, backend_state::CSVData, BackendAppState};
 
-use super::{File, FileHandler, FileID, FileProperties, Group, GroupID};
+use super::{File, FileHandler, FileID, FileProperties, Group};
 
 impl File {
     pub fn get_cache(&self) -> Option<&Vec<[f64; 2]>> {
@@ -40,11 +40,14 @@ impl File {
 impl FileHandler {
     pub fn add_search_results(
         &mut self,
-        search_results: HashSet<(PathBuf, GroupID)>,
+        search_results: HashSet<(PathBuf, usize)>,
         search_path: &Path,
         request_tx: &mut DynRequestSender,
     ) {
         for (fp, gid) in search_results.into_iter() {
+            if gid > 9 {
+                log::warn!("Group ID > 9 invalid, only 10 slots available, ignoring");
+            }
             // If file is already registered, we pull its ID from the registry,
             // otherwise we create a new ID and add the file to the registry.
             let fid = if let Some((fid, _)) = self
@@ -70,35 +73,32 @@ impl FileHandler {
             };
 
             // Add the ID to the group requested by user.
-            if let Some(grp) = self.groups.get_mut(&gid) {
+            if let Some(grp) = &mut self.groups[gid] {
                 grp.file_ids.insert(fid);
             } else {
                 let mut new_file_id_set = HashSet::new();
                 new_file_id_set.insert(fid);
-                let name = format!("Group ({})", gid.0);
-                self.groups.insert(
-                    gid,
-                    Group {
-                        file_ids: new_file_id_set,
-                        is_plotted: false,
-                        _id: gid,
-                        name,
-                    },
-                );
+                let name = format!("Group ({})", gid);
+                self.groups[gid] = Some(Group {
+                    file_ids: new_file_id_set,
+                    is_plotted: false,
+                    name,
+                });
             };
         }
     }
 
     pub fn remove(
         &mut self,
-        groups_to_delete: Vec<super::GroupID>,
-        files_to_delete: Vec<(super::GroupID, super::FileID)>,
+        groups_to_delete: Vec<usize>,
+        files_to_delete: Vec<(usize, super::FileID)>,
     ) {
         let mut item_was_removed = false;
 
-        for (gid, fid) in files_to_delete {
+        // Just in case, we filter gid which would lead to a panic when used as index.
+        for (gid, fid) in files_to_delete.into_iter().filter(|(gid, _)| *gid < 10) {
             let file_name = self.fid_to_filename_str(&fid).to_string();
-            if let Some(grp) = self.groups.get_mut(&gid) {
+            if let Some(grp) = &mut self.groups[gid] {
                 grp.file_ids.remove(&fid);
                 log::debug!(
                     "removed file '{file_name}' from group {} with ID {gid:?}",
@@ -110,13 +110,13 @@ impl FileHandler {
             }
         }
 
-        for gid in groups_to_delete.into_iter() {
-            if let Some(grp) = self.groups.remove(&gid) {
-                log::debug!("removed group '{}' with ID '{gid:?}'", grp.name);
-                item_was_removed = true;
+        for gid in groups_to_delete.into_iter().filter(|gid| *gid < 10) {
+            if let Some(Some(grp)) = self.groups.get(gid) {
+                log::debug!("removed group '{}' with ID '{gid}'", grp.name);
             } else {
-                log::warn!("trying to remove group with ID {gid:?} which does not exist");
+                log::warn!("trying to remove group with ID {gid} which does not exist");
             }
+            self.groups[gid] = None;
         }
 
         // If for some reason nothing was remove (which is currently impossible,
@@ -128,7 +128,12 @@ impl FileHandler {
         // Remove files from registry which are not member of any group.
         let mut mark_delete = Vec::new();
         for fid in self.registry.keys() {
-            if !self.groups.values().any(|grp| grp.file_ids.contains(fid)) {
+            if self
+                .groups
+                .iter()
+                .filter_map(|x| x.as_ref())
+                .any(|grp| grp.file_ids.contains(fid))
+            {
                 mark_delete.push(*fid);
             }
         }

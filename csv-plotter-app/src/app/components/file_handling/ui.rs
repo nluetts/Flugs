@@ -16,12 +16,14 @@ impl FileHandler {
         let mut mark_delete_files = Vec::new();
         let mut mark_delete_groups = Vec::new();
 
-        let mut group_ids: Vec<_> = self.groups.keys().cloned().collect();
-        group_ids.sort();
-        for gid in group_ids {
+        for (gid, grp) in self
+            .groups
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(id, x)| Some(id).zip(x.as_mut()))
+        {
             // Unwrapping is save here, because `group_ids` can only contain
             // valid keys.
-            let grp = self.groups.get_mut(&gid).unwrap();
             ui.heading(&grp.name);
             ui.horizontal(|ui| {
                 let lab = ui.label("rename:");

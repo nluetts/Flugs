@@ -11,15 +11,15 @@ UI:
   - [ ] Implement plotting of columns different than first two
     - [ ] Allow plotting more than one dataset from CSV file
 - [ ] Create Global Settings View
+- [ ] Include error log window 
 
 - [ ] Allow moving files between groups
 
 Search:
-- [ ] Make search folder open dialog not block the UI
+- [x] ~~Do not block the UI when opening new search path via file dialog~~
 - [ ] Allow search selection using keyboard up/down
 
-Global:
-- [ ] Use array of length 10 for groups
+Internals:
+- [x] ~~Use array of length 10 for groups instead of hashmap~~
 - [ ] Handle all UI interactions using an event system?
-- [ ] Include error log window 
  

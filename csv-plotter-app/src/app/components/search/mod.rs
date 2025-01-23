@@ -5,11 +5,14 @@ use std::{collections::HashSet, path::PathBuf, thread::JoinHandle};
 
 use app_core::frontend::UIParameter;
 
-use crate::app::{components::GroupID, DynRequestSender};
+use crate::app::DynRequestSender;
 
 pub struct Search {
     #[allow(clippy::complexity)]
-    matched_paths: UIParameter<Vec<(PathBuf, HashSet<usize>, Option<GroupID>)>>,
+    /// PathBuf is the path of the matched file, HashSet<usize> the indices
+    /// of the matched substrings, and Option<usize> the group where the file
+    /// should be inserted.
+    matched_paths: UIParameter<Vec<(PathBuf, HashSet<usize>, Option<usize>)>>,
     popup_shown: bool,
     search_path: UIParameter<PathBuf>,
     search_query: String,

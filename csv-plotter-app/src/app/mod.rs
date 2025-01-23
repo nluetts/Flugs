@@ -8,7 +8,7 @@ use app_core::backend::BackendRequest;
 use storage::load_json;
 use storage::save_json;
 
-pub use crate::app::components::{FileHandler, GroupID};
+pub use crate::app::components::FileHandler;
 
 use std::path::PathBuf;
 use std::time::Duration;

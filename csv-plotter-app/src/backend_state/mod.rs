@@ -1,6 +1,5 @@
 mod csv;
 
-use crate::app::GroupID;
 use app_core::backend::BackendState;
 use std::{
     collections::HashSet,
@@ -71,7 +70,7 @@ impl BackendAppState {
     ///
     /// For a file path to match, the file path must contain all words
     /// (separated by white space).
-    pub fn search_filter(&self, query: &str) -> Vec<(PathBuf, HashSet<usize>, Option<GroupID>)> {
+    pub fn search_filter(&self, query: &str) -> Vec<(PathBuf, HashSet<usize>, Option<usize>)> {
         let contains_query = |filename: &&PathBuf| {
             let fp = filename.to_str();
             if fp.is_none() {

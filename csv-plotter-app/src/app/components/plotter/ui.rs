@@ -14,6 +14,7 @@ impl super::Plotter {
                     file_handler
                         .registry
                         .get(fid)
+                        .filter(|file| file.get_cache().is_some())
                         .map(|file| self.plot(file, plot_ui));
                 }
             }
@@ -24,7 +25,9 @@ impl super::Plotter {
         if let Some(data) = file.get_cache() {
             plot_iu.line(egui_plot::Line::new(data.to_owned()));
         } else {
-            log::warn!(
+            // This should never happen because if the fileter applied in
+            // `Plotter::render`.
+            unreachable!(
                 "unable to get cache for plotting for file '{}'",
                 file.file_name()
             )

@@ -1,3 +1,4 @@
+use egui::Vec2;
 use egui_plot::Legend;
 
 use crate::app::components::{File, FileHandler, FileID};
@@ -16,14 +17,13 @@ impl super::Plotter {
             }
         });
 
-        // Get modifier input (we need this here already, to disallow the plot
-        // to be panned).
-        let modifiers = ctx.input(|i| [i.modifiers.alt, i.modifiers.ctrl, i.modifiers.shift]);
-        let modifier_down = modifiers.iter().any(|x| *x);
+        // These are needed to apply modifications to the selected file.
+        let mut spans = (0.0, 0.0);
+        let mut drag = Vec2::default();
 
         self.files_plot_ids.drain();
         let response = egui_plot::Plot::new("Plot")
-            .allow_drag(!modifier_down)
+            .allow_drag(self.selected_fid.is_none())
             .legend(Legend::default())
             .show(ui, |plot_ui| {
                 for (_, grp) in file_handler
@@ -42,17 +42,47 @@ impl super::Plotter {
                             .filter(|file| file.get_cache().is_some())
                         {
                             let egui_id = self.plot(fid, file, &grp.name, plot_ui);
-                            self.files_plot_ids.insert((egui_id, *fid));
+                            self.files_plot_ids.insert(egui_id, *fid);
                         }
                     }
                 }
+                drag = plot_ui.pointer_coordinate_drag_delta();
+                spans = {
+                    let bounds = plot_ui.plot_bounds();
+                    let xspan = (bounds.max()[0] - bounds.min()[0]).abs();
+                    let yspan = (bounds.max()[1] - bounds.min()[1]).abs();
+                    (xspan, yspan)
+                };
             });
-        if let Some(hovered_item_id) = response.hovered_plot_item {
-            let should_modify =
-                modifier_down && ctx.input(|i| i.pointer.is_moving() && i.pointer.primary_down());
 
+        // Get modifier input (we need this here already, to disallow the plot
+        // to be panned).
+        let modifiers = ctx.input(|i| [i.modifiers.alt, i.modifiers.ctrl, i.modifiers.shift]);
+        let modifier_down = modifiers.iter().any(|x| *x);
+        let mouse_pressed = ctx.input(|i| i.pointer.primary_pressed());
+
+        if let Some(hovered_fid) = response
+            .hovered_plot_item
+            .and_then(|id| self.files_plot_ids.get(&id))
+        {
+            // Select file, if its plot was clicked this frame.
+            if mouse_pressed {
+                self.selected_fid = Some(*hovered_fid);
+            }
+        } else {
+            // If we clicked somewhere and no modifier was pressed, we deselect
+            // the currently selected file.
+            if mouse_pressed && !modifier_down {
+                self.selected_fid = None;
+            }
+        }
+        if let Some(selected_file) = self
+            .selected_fid
+            .and_then(|fid| file_handler.registry.get_mut(&fid))
+        {
+            let should_modify = modifier_down && drag.length() > 0.0;
             if should_modify {
-                self.manipulate_plots(hovered_item_id, file_handler, modifiers, ctx);
+                self.manipulate_file(selected_file, modifiers, spans, drag);
             }
         }
     }
@@ -78,6 +108,12 @@ impl super::Plotter {
 
             // Plot the data.
             let color = auto_color(Into::<i32>::into(*fid));
+            let width;
+            if self.selected_fid.is_some_and(|sfid| sfid == *fid) {
+                width = 2.5;
+            } else {
+                width = 1.0;
+            };
             let name = if file.properties.alias.is_empty() {
                 format!("{} ({})", file.file_name(), group_name)
             } else {
@@ -87,6 +123,7 @@ impl super::Plotter {
             plot_iu.line(
                 egui_plot::Line::new(data.to_owned())
                     .color(color)
+                    .width(width)
                     .name(name)
                     .id(egui_id),
             );

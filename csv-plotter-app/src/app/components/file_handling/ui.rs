@@ -3,12 +3,16 @@ use crate::app::DynRequestSender;
 use super::FileHandler;
 
 impl FileHandler {
-    pub(crate) fn render_groups(
+    pub(crate) fn render(
         &mut self,
         _request_tx: &mut DynRequestSender,
         ui: &mut egui::Ui,
         _ctx: &egui::Context,
     ) {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+            ui.heading("Groups and Files")
+        });
+
         let mut mark_delete_files = Vec::new();
         let mut mark_delete_groups = Vec::new();
 

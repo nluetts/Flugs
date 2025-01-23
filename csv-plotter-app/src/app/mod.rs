@@ -130,14 +130,6 @@ impl eframe::App for EguiApp {
 
 impl EguiApp {
     fn central_panel(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        ui.with_layout(
-            egui::Layout::right_to_left(egui::Align::Min),
-            |ui| match self.ui_selection {
-                U::Plot => ui.heading("Plots"),
-                U::FileSettings => ui.heading("Groups and Files"),
-            },
-        );
-
         let search_results = self.search.render(&mut self.request_tx, ui, ctx);
         let num_results = search_results.len();
         if !search_results.is_empty() {
@@ -152,9 +144,7 @@ impl EguiApp {
         use UISelection as U;
         match self.ui_selection {
             U::Plot => self.plotter.render(&mut self.file_handler, ui, ctx),
-            U::FileSettings => self
-                .file_handler
-                .render_groups(&mut self.request_tx, ui, ctx),
+            U::FileSettings => self.file_handler.render(&mut self.request_tx, ui, ctx),
         }
     }
 

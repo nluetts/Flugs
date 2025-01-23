@@ -1,8 +1,10 @@
 UI:
 - [x] ~~Implement plotting/hiding of groups accessible with switch
       buttons on plotting UI~~
-- [ ] Include legend showing filename or alias
-- [ ] Select good colors for plots based on FileID
+- [.] Include legend
+  - [x] ~Showing filename~~
+  - [ ] Showing alias
+- [x] Select good colors for plots based on FileID
 - [ ] Implement file setting form
   - [x] ~~Use collapsing header for file settings form~~
   - [ ] Allow alias for file
@@ -12,12 +14,16 @@ UI:
     - [ ] Allow plotting more than one dataset from CSV file
 - [ ] Create Global Settings View
 - [ ] Include error log window 
+- [ ] Files in file settings few should have a fixed order
 
 - [ ] Allow moving files between groups
 
 Search:
 - [x] ~~Do not block the UI when opening new search path via file dialog~~
 - [ ] Allow search selection using keyboard up/down
+
+Plotter:
+- [ ] Have a flag to disable/enable the legend
 
 Internals:
 - [x] ~~Use array of length 10 for groups instead of hashmap~~

@@ -11,7 +11,7 @@ use app_core::{
 
 use crate::{app::DynRequestSender, backend_state::CSVData, BackendAppState};
 
-use super::{File, FileHandler, FileID, FileProperties, Group};
+use super::{File, FileHandler, FileID, Group};
 
 impl File {
     pub fn get_cache(&self) -> Option<&Vec<[f64; 2]>> {
@@ -20,20 +20,6 @@ impl File {
             .as_ref()
             .map(|dat| &dat.get_cache().data)
             .ok()
-    }
-
-    pub fn from_storage(
-        path: PathBuf,
-        properties: FileProperties,
-        request_tx: &mut DynRequestSender,
-    ) -> Self {
-        let mut csv_data = UIParameter::new(Err("Data no loaded".to_string()));
-        csv_data.set_recv(parse_csv(&path, request_tx));
-        File {
-            csv_data,
-            path,
-            properties,
-        }
     }
 }
 

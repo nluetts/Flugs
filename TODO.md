@@ -22,4 +22,5 @@ Search:
 Internals:
 - [x] ~~Use array of length 10 for groups instead of hashmap~~
 - [ ] Handle all UI interactions using an event system?
- 
+- [ ] Remove hard coded paths
+  - [ ] Work with configuration file

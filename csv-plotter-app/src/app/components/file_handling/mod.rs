@@ -4,8 +4,10 @@ mod ui;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
+use crate::app::DynRequestSender;
 use crate::backend_state::CSVData;
 use app_core::frontend::UIParameter;
+use logic::parse_csv;
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -38,7 +40,34 @@ pub struct Group {
     pub name: String,
 }
 
+impl FileHandler {
+    pub fn new(
+        groups: [Option<Group>; 10],
+        registry: HashMap<FileID, File>,
+        next_id: FileID,
+    ) -> Self {
+        Self {
+            groups,
+            registry,
+            next_id,
+        }
+    }
+}
+
 impl File {
+    pub fn new(
+        path: PathBuf,
+        properties: FileProperties,
+        request_tx: &mut DynRequestSender,
+    ) -> Self {
+        let mut csv_data = UIParameter::new(Err("Data no loaded".to_string()));
+        csv_data.set_recv(parse_csv(&path, request_tx));
+        File {
+            csv_data,
+            path,
+            properties,
+        }
+    }
     pub fn file_name(&self) -> &str {
         self.path
             .file_name()

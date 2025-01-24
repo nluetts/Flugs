@@ -7,7 +7,7 @@ use crate::{app::DynRequestSender, BackendAppState};
 impl super::Search {
     pub fn try_update(&mut self) {
         self.search_path.try_update();
-        self.matched_paths.try_update();
+        self.matches.try_update();
         if let Some(handle) = self
             .awaiting_search_path_selection
             .take_if(|handle| handle.is_finished())
@@ -41,9 +41,15 @@ impl super::Search {
     pub(super) fn query_current_path(&mut self, request_tx: &mut DynRequestSender) {
         let query = self.search_query.to_owned();
         BackendLink::request_parameter_update(
-            &mut self.matched_paths,
+            &mut self.matches,
             "fuzzy match child paths",
-            move |b: &mut BackendEventLoop<BackendAppState>| b.state.search_filter(&query),
+            move |b: &mut BackendEventLoop<BackendAppState>| {
+                let search_results = b.state.search_filter(&query);
+                search_results
+                    .into_iter()
+                    .map(|(path, indices)| super::Match::new(path, indices, None, None))
+                    .collect()
+            },
             request_tx,
         );
     }

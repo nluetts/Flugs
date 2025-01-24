@@ -1,7 +1,4 @@
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, path::Path};
 
 use egui::{text::LayoutJob, Color32, FontId, InputState, Label, Pos2, TextFormat};
 
@@ -13,7 +10,7 @@ impl super::Search {
         request_tx: &mut DynRequestSender,
         _ui: &mut egui::Ui,
         ctx: &egui::Context,
-    ) -> HashSet<(PathBuf, usize)> {
+    ) -> HashSet<super::Match> {
         let mut popup_opened_this_frame = false;
         // sense if search shortcut was pressed
         if ctx.input(|i| i.modifiers.command && i.key_released(egui::Key::Space)) {
@@ -81,7 +78,7 @@ impl super::Search {
                 self.query_current_path(request_tx);
             };
 
-            let paths_ui_enabled = self.matched_paths.is_up_to_date();
+            let paths_ui_enabled = self.matches.is_up_to_date();
 
             ui.add_enabled_ui(paths_ui_enabled, |ui| {
                 self.matches_ui(ui, phrase_input, ctx);
@@ -96,11 +93,11 @@ impl super::Search {
 
         if ctx.input(|i| i.key_released(egui::Key::Enter)) {
             self.popup_shown = false;
-            let to_load: HashSet<(PathBuf, usize)> = self
-                .matched_paths
+            let to_load: HashSet<super::Match> = self
+                .matches
                 .value_mut()
                 .drain(..)
-                .filter_map(|(path, _, group_id)| group_id.map(|gid| (path, gid)))
+                .filter(|mtch| mtch.assigned_group.is_some())
                 .collect();
             self.search_query.clear();
             log::debug!("returning {} paths to load", to_load.len());
@@ -114,7 +111,13 @@ impl super::Search {
         let height = 600.0;
 
         let scroll_area = |ui: &mut egui::Ui| {
-            for (fp, indices, group_id) in self.matched_paths.value_mut() {
+            for super::Match {
+                path: fp,
+                matched_indices: indices,
+                assigned_group: group_id,
+                parsed_data: _csv_data,
+            } in self.matches.value_mut()
+            {
                 if indices.is_empty() {
                     break;
                 }

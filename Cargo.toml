@@ -5,7 +5,7 @@ members = [
   "csv-plotter-app",
 ]
 
-default-members = ["csv-plotter-app"]
+default-members = ["csv-plotter-app", "app-core"]
 
 [workspace.dependencies]
 

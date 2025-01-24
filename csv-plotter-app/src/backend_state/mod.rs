@@ -70,7 +70,7 @@ impl BackendAppState {
     ///
     /// For a file path to match, the file path must contain all words
     /// (separated by white space).
-    pub fn search_filter(&self, query: &str) -> Vec<(PathBuf, HashSet<usize>, Option<usize>)> {
+    pub fn search_filter(&self, query: &str) -> Vec<(PathBuf, HashSet<usize>)> {
         let contains_query = |filename: &&PathBuf| {
             let fp = filename.to_str();
             if fp.is_none() {
@@ -86,7 +86,7 @@ impl BackendAppState {
                 let idx = fp.find(q)?;
                 indices.extend(idx..idx + q.len());
             }
-            Some((filename.to_owned(), indices, None))
+            Some((filename.to_owned(), indices))
         };
 
         self.child_paths_unfiltered

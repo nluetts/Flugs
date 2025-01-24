@@ -1,7 +1,4 @@
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, path::Path};
 
 use app_core::{
     backend::{BackendEventLoop, BackendLink, LinkReceiver},
@@ -9,7 +6,11 @@ use app_core::{
     BACKEND_HUNG_UP_MSG,
 };
 
-use crate::{app::DynRequestSender, backend_state::CSVData, BackendAppState};
+use crate::{
+    app::{components::search::Match, DynRequestSender},
+    backend_state::CSVData,
+    BackendAppState,
+};
 
 use super::{File, FileHandler, FileID, Group};
 
@@ -26,11 +27,20 @@ impl File {
 impl FileHandler {
     pub fn add_search_results(
         &mut self,
-        search_results: HashSet<(PathBuf, usize)>,
+        search_results: HashSet<Match>,
         search_path: &Path,
         request_tx: &mut DynRequestSender,
     ) {
-        for (fp, gid) in search_results.into_iter() {
+        for Match {
+            path: fp,
+            matched_indices: _,
+            assigned_group: gid,
+            // TODO: use pre-cached CSV data from search matches
+            parsed_data: _,
+        } in search_results.into_iter()
+        {
+            let gid =
+                gid.expect("file handler was handed a search result not assigned to any group");
             if gid > 9 {
                 log::warn!("Group ID > 9 invalid, only 10 slots available, ignoring");
             }

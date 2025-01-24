@@ -118,7 +118,7 @@ impl FileHandler {
                 .groups
                 .iter()
                 .filter_map(|x| x.as_ref())
-                .any(|grp| grp.file_ids.contains(fid))
+                .all(|grp| !grp.file_ids.contains(fid))
             {
                 mark_delete.push(*fid);
             }

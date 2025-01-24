@@ -33,5 +33,5 @@ Internals:
 - [ ] CSV with repeated delimiter (whitespace) should parse correctly
 
 BUGS:
-- [ ] Removing one file from group may may delete all files
+- [x] ~~Removing one file from group may may delete all files~~
 - [x] ~~CSV parsing can panic~~

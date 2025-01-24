@@ -2,7 +2,7 @@ UI:
 - [x] ~~Implement plotting/hiding of groups accessible with switch
       buttons on plotting UI~~
 - [.] Include legend
-  - [x] ~Showing filename~~
+  - [x] ~~Showing filename~~
   - [x] ~~Showing alias~~
 - [x] ~~Select good colors for plots based on FileID~~
 - [ ] Implement file settings form
@@ -30,7 +30,8 @@ Internals:
 - [ ] Handle all UI interactions using an event system?
 - [ ] Remove hard coded paths
   - [ ] Work with configuration file
+- [ ] CSV with repeated delimiter (whitespace) should parse correctly
 
 BUGS:
 - [ ] Removing one file from group may may delete all files
-- [ ] CSV parsing can panic
+- [x] ~~CSV parsing can panic~~

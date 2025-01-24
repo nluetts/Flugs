@@ -2,8 +2,6 @@
 
 use std::{collections::HashMap, path::Path};
 
-use app_core::frontend::UIParameter;
-
 #[derive(Debug, Default, Clone)]
 pub struct CSVCache {
     pub data: Vec<[f64; 2]>,
@@ -194,10 +192,16 @@ impl CSVData {
             }
 
             for (j, entry) in row.split(delimiter.char).enumerate() {
-                // Remove whitespace and `"` (if present) before parsing.
-                match entry.trim().trim_matches('"').parse::<f64>() {
-                    Ok(num) => row_buffer[j] = num,
-                    Err(e) => {
+                match (
+                    // Remove whitespace and `"` (if present) before parsing.
+                    entry.trim().trim_matches('"').parse::<f64>(),
+                    row_buffer.get_mut(j),
+                ) {
+                    (Ok(num), Some(buf_num)) => *buf_num = num,
+                    (Ok(num), None) => {
+                        log::warn!("tried to insert {num} into buffer of invalid length")
+                    }
+                    (Err(e), _) => {
                         log::debug!("failed to parse row {i} entry {j}: {e}");
                         // If we cannot parse an entry, we ignore the entire row.
                         num_ignored += 1;
@@ -205,8 +209,8 @@ impl CSVData {
                     }
                 }
             }
-            for (i, num) in row_buffer.iter().enumerate() {
-                columns[i].push(*num);
+            for (num, col) in row_buffer.iter().zip(columns.iter_mut()) {
+                col.push(*num);
             }
         }
 

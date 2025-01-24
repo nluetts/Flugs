@@ -20,6 +20,7 @@ pub struct FileHandler {
     pub groups: [Option<Group>; 10],
     pub registry: HashMap<FileID, File>,
     next_id: FileID,
+    group_name_buffer: [String; 10],
 }
 
 #[derive(Debug)]
@@ -37,7 +38,7 @@ pub struct FileProperties {
     pub yscale: f64,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Group {
     pub file_ids: HashSet<FileID>,
     pub is_plotted: bool,
@@ -54,6 +55,7 @@ impl FileHandler {
             groups,
             registry,
             next_id,
+            group_name_buffer: [const { String::new() }; 10],
         }
     }
 }

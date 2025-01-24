@@ -1,18 +1,16 @@
 mod components;
+mod events;
 pub mod storage;
 
 use self::components::{Plotter, Search};
-use crate::BackendAppState;
-use crate::ROOT_PATH;
+use crate::{BackendAppState, ROOT_PATH};
 use app_core::backend::BackendRequest;
-use storage::load_json;
-use storage::save_json;
+use app_core::event::AppEvent;
+use storage::{load_json, save_json};
 
 pub use crate::app::components::FileHandler;
 
-use std::path::PathBuf;
-use std::time::Duration;
-use std::{sync::mpsc::Sender, thread::JoinHandle};
+use std::{path::PathBuf, sync::mpsc::Sender, thread::JoinHandle, time::Duration};
 
 pub type DynRequestSender = Sender<Box<dyn BackendRequest<BackendAppState>>>;
 
@@ -24,6 +22,7 @@ pub struct EguiApp {
     search: Search,
     shortcuts_modal_open: bool,
     ui_selection: UISelection,
+    event_queue: Vec<Box<dyn AppEvent<App = Self>>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -61,10 +60,16 @@ impl EguiApp {
             search,
             shortcuts_modal_open: false,
             ui_selection: UISelection::Plot,
+            event_queue: Vec::new(),
         }
     }
 
     fn update_state(&mut self) {
+        while let Some(event) = self.event_queue.pop() {
+            if let Err(error) = event.apply(self) {
+                log::error!("{}", error);
+            }
+        }
         self.file_handler.try_update();
         self.search.try_update();
     }
@@ -144,7 +149,10 @@ impl EguiApp {
         use UISelection as U;
         match self.ui_selection {
             U::Plot => self.plotter.render(&mut self.file_handler, ui, ctx),
-            U::FileSettings => self.file_handler.render(&mut self.request_tx, ui, ctx),
+            U::FileSettings => {
+                self.file_handler
+                    .render(&mut self.request_tx, &mut self.event_queue, ui, ctx)
+            }
         }
     }
 

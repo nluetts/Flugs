@@ -5,7 +5,7 @@ UI:
   - [x] ~~Showing filename~~
   - [x] ~~Showing alias~~
 - [x] ~~Select good colors for plots based on FileID~~
-- [ ] Implement file settings form
+- [.] Implement file settings form
   - [x] ~~Use collapsing header for file settings form~~
   - [x] ~~Allow alias for file~~
   - [ ] Allow selection of plot color
@@ -16,18 +16,18 @@ UI:
 - [ ] Include error log window 
 - [ ] Files in file settings view should have a fixed order
 
-- [ ] Allow moving files between groups
+- [x] ~~Allow moving files between groups~~
 
 Search:
 - [x] ~~Do not block the UI when opening new search path via file dialog~~
-- [ ] Allow search selection using keyboard up/down
+- [ ] Allow selection using keyboard up/down in search modal
 
 Plotter:
 - [ ] Have a flag to disable/enable the legend
 
 Internals:
 - [x] ~~Use array of length 10 for groups instead of hashmap~~
-- [ ] Handle all UI interactions using an event system?
+- [x] ~~Handle UI interactions using an event system?~~
 - [ ] Remove hard coded paths
   - [ ] Work with configuration file
 - [ ] CSV with repeated delimiter (whitespace) should parse correctly

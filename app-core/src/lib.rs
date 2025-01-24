@@ -1,6 +1,7 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 pub mod backend;
+pub mod event;
 pub mod frontend;
 pub mod storage;
 pub mod string_error;

@@ -3,10 +3,12 @@ resolver = "2"
 members = [
   "app-core",
   "csv-plotter-app",
+  "turbo-csv",
 ]
 
-default-members = ["csv-plotter-app", "app-core"]
+default-members = ["app-core", "csv-plotter-app", "turbo-csv"]
 
 [workspace.dependencies]
 
 app-core = { path = "app-core" }
+turbo-csv = { path = "turbo-csv" }

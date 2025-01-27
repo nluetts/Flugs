@@ -1,2 +1,2 @@
 default:
-    cargo test --lib -- --nocapture
+    RUST_LOG=debug cargo test --lib -- --nocapture

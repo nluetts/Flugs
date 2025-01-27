@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{from_reader, to_writer};
-use std::{io::Read, os::fd::AsFd, str::FromStr};
+use std::{io::Read, os::fd::AsFd, path::Path, str::FromStr};
 
 use super::string_error::ErrorStringExt;
 
@@ -30,18 +30,28 @@ where
         }
     }
 
-    pub fn save_json(&self) -> Result<(), String> {
+    pub fn save_json(&self, input_path: Option<&Path>) -> Result<(), String> {
+        let default_path = std::path::PathBuf::from(STORAGE_FILE);
+        let output_path = if let Some(path) = input_path {
+            path
+        } else {
+            &default_path
+        };
         let file =
-            std::fs::File::create(STORAGE_FILE).err_to_string("could not open storage file")?;
+            std::fs::File::create(output_path).err_to_string("could not open storage file")?;
         to_writer(file, &self).err_to_string("could not save app state to json")?;
-        let output_path = std::path::PathBuf::from_str(STORAGE_FILE).unwrap();
         log::debug!("saved app state to file {:?}", output_path.canonicalize());
         Ok(())
     }
 
-    pub fn from_json() -> Result<Self, String> {
-        let mut file =
-            std::fs::File::open(STORAGE_FILE).err_to_string("could not open storage file")?;
+    pub fn load_json(input_path: Option<&Path>) -> Result<Storage<B, F>, String> {
+        let default_path = std::path::PathBuf::from(STORAGE_FILE);
+        let output_path = if let Some(path) = input_path {
+            path
+        } else {
+            &default_path
+        };
+        let file = std::fs::File::open(output_path).err_to_string("could not open storage file")?;
         let storage =
             from_reader(file).err_to_string("could not load app state from storage file")?;
         Ok(storage)

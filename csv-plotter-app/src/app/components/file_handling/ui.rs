@@ -1,11 +1,10 @@
 use std::fmt::Write;
 
-use app_core::event::AppEvent;
 use egui::{text::LayoutJob, Color32, FontId};
 
 use crate::{
     app::{
-        events::{CopyFile, MoveFile, RemoveFile, RemoveGroup},
+        events::{CopyFile, EventQueue, MoveFile, RemoveFile, RemoveGroup},
         DynRequestSender,
     },
     EguiApp,
@@ -17,7 +16,7 @@ impl FileHandler {
     pub(crate) fn render(
         &mut self,
         _request_tx: &mut DynRequestSender,
-        event_queue: &mut Vec<Box<dyn AppEvent<App = EguiApp>>>,
+        event_queue: &mut EventQueue<EguiApp>,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
     ) {
@@ -50,7 +49,7 @@ impl FileHandler {
                 let lab = ui.label("rename:");
                 ui.text_edit_singleline(&mut grp.name).labelled_by(lab.id);
                 if ui.small_button("🗑").clicked() {
-                    event_queue.push(Box::new(RemoveGroup::new(gid)));
+                    event_queue.queue_event(Box::new(RemoveGroup::new(gid)));
                 }
             });
             let grp_label_txt = LayoutJob::simple_singleline(
@@ -84,7 +83,7 @@ fn render_file_form(
     file: &mut File,
     gid: usize,
     group_names: &[String],
-    event_queue: &mut Vec<Box<dyn AppEvent<App = EguiApp>>>,
+    event_queue: &mut EventQueue<EguiApp>,
 ) {
     let mut file_label_txt =
         if let Some(name) = file.path.file_name().and_then(|name| name.to_str()) {
@@ -122,8 +121,7 @@ fn render_file_form(
             ui.horizontal(|ui| {
                 egui::ComboBox::new((gid, fid, "move"), "Move to Group").show_ui(ui, |ui| {
                     ui.selectable_value(&mut target, (None, false), "");
-                    for i in 0..10 {
-                        let grp_name = &group_names[i];
+                    for (i, grp_name) in group_names.iter().enumerate().take(10) {
                         let label = if grp_name.is_empty() {
                             format!("<insert new at {}>", i + 1)
                         } else {
@@ -134,8 +132,7 @@ fn render_file_form(
                 });
                 egui::ComboBox::new((gid, fid, "copy"), "Copy to Group").show_ui(ui, |ui| {
                     ui.selectable_value(&mut target, (None, false), "");
-                    for i in 0..10 {
-                        let grp_name = &group_names[i];
+                    for (i, grp_name) in group_names.iter().enumerate().take(10) {
                         let label = if grp_name.is_empty() {
                             format!("<insert new at {}>", i + 1)
                         } else {
@@ -147,10 +144,10 @@ fn render_file_form(
             });
             match target {
                 (Some(target_gid), true) => {
-                    event_queue.push(Box::new(MoveFile::new(*fid, gid, target_gid)))
+                    event_queue.queue_event(Box::new(MoveFile::new(*fid, gid, target_gid)))
                 }
                 (Some(target_gid), false) => {
-                    event_queue.push(Box::new(CopyFile::new(*fid, target_gid)))
+                    event_queue.queue_event(Box::new(CopyFile::new(*fid, target_gid)))
                 }
                 (None, _) => (),
             }
@@ -159,7 +156,7 @@ fn render_file_form(
         // Identifier and delete button.
         ui.label(format!("(ID {})", fid.0));
         if ui.small_button("🗑").clicked() {
-            event_queue.push(Box::new(RemoveFile::new(*fid, gid)));
+            event_queue.queue_event(Box::new(RemoveFile::new(*fid, gid)));
         }
     });
 }

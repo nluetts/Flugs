@@ -45,7 +45,7 @@ impl Search {
 
 impl Hash for Match {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        ((self.path.clone(), self.assigned_group)).hash(state)
+        (self.path.clone(), self.assigned_group).hash(state)
     }
 }
 

@@ -8,6 +8,7 @@ impl super::Search {
     pub fn try_update(&mut self) {
         self.search_path.try_update();
         self.matches.try_update();
+        // Receive new search path, if already available.
         if let Some(handle) = self
             .awaiting_search_path_selection
             .take_if(|handle| handle.is_finished())

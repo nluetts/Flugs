@@ -15,6 +15,8 @@ UI:
 - [ ] Create Global Settings View
 - [ ] Include error log window 
 - [ ] Files in file settings view should have a fixed order
+- [ ] Allow to attach meta data to files
+- [x] ~~Allow saving/loading to/from arbitrary path~~
 
 - [x] ~~Allow moving files between groups~~
 

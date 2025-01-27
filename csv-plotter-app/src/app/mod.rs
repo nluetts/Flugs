@@ -3,9 +3,10 @@ mod events;
 pub mod storage;
 
 use self::components::{Plotter, Search};
+use crate::app::events::EventQueue;
 use crate::{BackendAppState, ROOT_PATH};
 use app_core::backend::BackendRequest;
-use app_core::event::AppEvent;
+use events::SaveLoadRequested;
 use storage::{load_json, save_json};
 
 pub use crate::app::components::FileHandler;
@@ -22,7 +23,7 @@ pub struct EguiApp {
     search: Search,
     shortcuts_modal_open: bool,
     ui_selection: UISelection,
-    event_queue: Vec<Box<dyn AppEvent<App = Self>>>,
+    event_queue: EventQueue<Self>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -60,16 +61,12 @@ impl EguiApp {
             search,
             shortcuts_modal_open: false,
             ui_selection: UISelection::Plot,
-            event_queue: Vec::new(),
+            event_queue: EventQueue::<Self>::new(),
         }
     }
 
     fn update_state(&mut self) {
-        while let Some(event) = self.event_queue.pop() {
-            if let Err(error) = event.apply(self) {
-                log::error!("{}", error);
-            }
-        }
+        self.run_events();
         self.file_handler.try_update();
         self.search.try_update();
     }
@@ -93,14 +90,14 @@ impl eframe::App for EguiApp {
                 self.ui_selection = self.ui_selection.next();
             }
             // Quick save app state.
-            if i.key_pressed(egui::Key::F5) {
-                if let Err(error) = save_json(self) {
+            if i.key_pressed(egui::Key::F6) {
+                if let Err(error) = save_json(self, None) {
                     log::error!("{}", error)
                 };
             }
             // Quick load app state.
-            if i.key_pressed(egui::Key::F6) {
-                if let Err(error) = load_json(self) {
+            if i.key_pressed(egui::Key::F5) {
+                if let Err(error) = load_json(self, None) {
                     log::error!("{}", error)
                 };
             }
@@ -109,6 +106,18 @@ impl eframe::App for EguiApp {
                 // Quitting cannot be requested from within here, the UI stops,
                 // but not the backend thread.
                 should_quit = true;
+            }
+            if i.key_pressed(egui::Key::S) && i.modifiers.ctrl {
+                log::debug!("open dialog to select save path");
+                let handle = std::thread::spawn(|| rfd::FileDialog::new().save_file());
+                let event = SaveLoadRequested::new(true, Some(handle));
+                self.event_queue.queue_event(Box::new(event));
+            }
+            if i.key_pressed(egui::Key::L) && i.modifiers.ctrl {
+                log::debug!("open dialog to select load path");
+                let handle = std::thread::spawn(|| rfd::FileDialog::new().pick_file());
+                let event = SaveLoadRequested::new(false, Some(handle));
+                self.event_queue.queue_event(Box::new(event));
             }
         });
 
@@ -160,16 +169,28 @@ impl EguiApp {
         egui::menu::bar(ui, |ui| {
             {
                 ui.menu_button("File", |ui| {
-                    if ui.button("Quick Save (F5)").clicked() {
-                        if let Err(error) = save_json(self) {
+                    if ui.button("Save").clicked() {
+                        log::debug!("open dialog to select save path");
+                        let handle = std::thread::spawn(|| rfd::FileDialog::new().save_file());
+                        let event = SaveLoadRequested::new(true, Some(handle));
+                        self.event_queue.queue_event(Box::new(event));
+                    }
+                    if ui.button("Load").clicked() {
+                        log::debug!("open dialog to select load path");
+                        let handle = std::thread::spawn(|| rfd::FileDialog::new().pick_file());
+                        let event = SaveLoadRequested::new(false, Some(handle));
+                        self.event_queue.queue_event(Box::new(event));
+                    }
+                    if ui.button("Quick Save").clicked() {
+                        if let Err(error) = save_json(self, None) {
                             log::error!("{}", error)
                         };
                     }
-                    if ui.button("Quick Load (F6)").clicked() {
+                    if ui.button("Quick Load").clicked() {
                         // We can do the loading on the main thread, because
                         // files (the only thing that takes time) are loaded on
                         // the backend anyway.
-                        if let Err(error) = load_json(self) {
+                        if let Err(error) = load_json(self, None) {
                             log::error!("{}", error)
                         };
                     }
@@ -188,7 +209,7 @@ impl EguiApp {
                     );
                 });
 
-                ui.toggle_value(&mut self.shortcuts_modal_open, "Help");
+                ui.toggle_value(&mut self.shortcuts_modal_open, "Help (F1)");
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     egui::widgets::global_theme_preference_buttons(ui);
@@ -205,13 +226,17 @@ impl EguiApp {
                     ui.separator();
                     ui.label("CTRL + Space = Open Search Menu");
                     ui.separator();
+                    ui.label("CTRL + S = Open Save Dialog");
+                    ui.separator();
+                    ui.label("CTRL + L = Open Load Dialog");
+                    ui.separator();
                     ui.label("F1 = Show Keyboard Shortcuts");
                     ui.separator();
                     ui.label("F3 = Cycle View");
                     ui.separator();
-                    ui.label("F5 = Save App State");
+                    ui.label("F6 = Save App State");
                     ui.separator();
-                    ui.label("F6 = Load App State");
+                    ui.label("F5 = Load App State");
                     ui.separator();
                     ui.label("F10 = Quit App");
                     ui.separator();

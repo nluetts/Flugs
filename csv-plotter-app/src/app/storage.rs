@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use app_core::storage::Storage;
 use serde::{Deserialize, Serialize};
@@ -23,7 +26,7 @@ struct FrontendStorage {
     next_id: FileID,
 }
 
-pub fn save_json(app: &EguiApp) -> Result<(), String> {
+pub fn save_json(app: &EguiApp, path: Option<&Path>) -> Result<(), String> {
     let backend_storage = BackendStorage {};
 
     let frontend_storage = FrontendStorage {
@@ -46,14 +49,14 @@ pub fn save_json(app: &EguiApp) -> Result<(), String> {
         next_id: app.file_handler.current_id(),
     };
     let storage = Storage::new(backend_storage, frontend_storage);
-    storage.save_json()
+    storage.save_json(path)
 }
 
-pub fn load_json(app: &mut EguiApp) -> Result<(), String> {
+pub fn load_json(app: &mut EguiApp, path: Option<&Path>) -> Result<(), String> {
     let Storage::<BackendStorage, FrontendStorage> {
         backend_storage: _,
         frontend_storage,
-    } = Storage::from_json()?;
+    } = Storage::load_json(path)?;
 
     app.search.set_search_path(&frontend_storage.search_path);
     app.file_handler = frontend_storage.into_file_handler(&mut app.request_tx);

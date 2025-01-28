@@ -69,40 +69,43 @@ impl Lexer {
         // Note that incrementing j in the code below usually means we
         // accept the char as belonging to the token currently parsed.
         let mut i = 0;
-        let mut j = 0;
 
         for (line_no, line) in raw_input.lines().enumerate() {
-            log::debug!("line {}, i = {}, j = {}", line_no, i, j);
+            log::debug!("line {}, i = {}", line_no, i);
             let mut chrs = line.chars().enumerate().peekable();
-            while let Some((k, chr)) = chrs.next() {
+            while let Some((j, chr)) = chrs.next() {
                 match self.cur_state {
                     // Ordered roughly by my guess of how common these patterns
                     // are.
                     State::InInteger => match chr {
-                        '0'..='9' => j += 1,
+                        '0'..='9' => {
+                            // Nothing to do, the counter will advance;
+                        }
 
                         ' ' | ',' | '\t' | ';' => {
-                            tokens.push(emit_token(&raw_input, &mut i, &mut j, self.cur_state));
+                            // We have to emit the previous integer token.
+                            tokens.push(emit_token(&line, &mut i, j, self.cur_state));
                             self.cur_state = State::OnDelimiter;
-                            tokens.push(emit_token(&raw_input, &mut i, &mut j, self.cur_state));
+                            tokens.push(emit_token(&line, &mut i, j + 1, self.cur_state));
                         }
 
                         '.' => {
-                            j += 1;
                             self.cur_state = State::InFloat;
                         }
 
                         _ => {
-                            j += 1;
-                            tokens.push(emit_token(&raw_input, &mut i, &mut j, State::Invalid));
+                            tokens.push(emit_token(&line, &mut i, j, State::Invalid));
                         }
                     },
 
                     State::InFloat => {}
 
                     State::OnDelimiter => match chr {
+                        ' ' | ',' | '\t' | ';' => {
+                            tokens.push(emit_token(&line, &mut i, j, self.cur_state));
+                        }
+
                         '0'..='9' => {
-                            j += 1;
                             self.cur_state = State::InInteger;
                         }
 
@@ -111,7 +114,6 @@ impl Lexer {
 
                     State::StartOfLine => match chr {
                         '0'..='9' => {
-                            j += 1;
                             self.cur_state = State::InInteger;
                         }
                         _ => todo!(),
@@ -140,14 +142,14 @@ impl Lexer {
                     }
                 }
                 log::debug!(
-                    "char k = {} = '{}', i = {}, j = {}, state = {:?}",
-                    k,
+                    "char '{}', i = {}, j = {}, state = {:?}",
                     chr,
                     i,
                     j,
                     self.cur_state
                 );
             }
+            // Handle what happens at the end of each line.
         }
         tokens
     }
@@ -157,22 +159,26 @@ impl Lexer {
 /// Panics if text handed cannot be parsed according to the state.
 /// This should only happen if there is an unconsidered edge case
 /// or a logic error.
-fn emit_token<'a>(raw_text: &'a str, i: &mut usize, j: &mut usize, state: State) -> Token<'a> {
+fn emit_token<'a>(raw_text: &'a str, i: &mut usize, j: usize, state: State) -> Token<'a> {
     let fail_msg = "token emitter was handed invalid raw text";
-    log::debug!("{}", &raw_text[*i..*j]);
+    log::debug!(
+        "emitting token for {}, i = {}, j = {}",
+        &raw_text[*i..j],
+        i,
+        j
+    );
     let token = match state {
-        State::InComment => Token::Comment(&raw_text[*i..*j]),
-        State::OnDelimiter => Token::Delimiter(raw_text[*i..*j].chars().nth(0).expect(&fail_msg)),
+        State::InComment => Token::Comment(&raw_text[*i..j]),
+        State::OnDelimiter => Token::Delimiter(raw_text[*i..j].chars().nth(0).expect(&fail_msg)),
         State::MaybeInteger => todo!(),
-        State::InInteger => Token::Integer(raw_text[*i..*j].parse::<i64>().expect(&fail_msg)),
+        State::InInteger => Token::Integer(raw_text[*i..j].parse::<i64>().expect(&fail_msg)),
         State::MaybeFloat => todo!(),
         State::InFloat => todo!(),
         State::InScientific => todo!(),
         State::StartOfLine => todo!(),
         State::Invalid => todo!(),
     };
-    *i = *j;
-    *j = *i + 1;
+    *i = j;
     token
 }
 

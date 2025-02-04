@@ -21,6 +21,7 @@ pub struct FileHandler {
     pub registry: HashMap<FileID, File>,
     next_id: FileID,
     group_name_buffer: [String; 10],
+    active_element: ActiveElement,
 }
 
 #[derive(Debug)]
@@ -45,6 +46,12 @@ pub struct Group {
     pub name: String,
 }
 
+#[derive(Debug)]
+enum ActiveElement {
+    Group(usize),
+    File(FileID, usize),
+}
+
 impl FileHandler {
     pub fn new(
         groups: [Option<Group>; 10],
@@ -56,6 +63,7 @@ impl FileHandler {
             registry,
             next_id,
             group_name_buffer: [const { String::new() }; 10],
+            active_element: ActiveElement::Group(0),
         }
     }
 }
@@ -96,5 +104,11 @@ impl Default for FileProperties {
 impl From<FileID> for i32 {
     fn from(val: FileID) -> Self {
         val.0 as i32
+    }
+}
+
+impl Default for ActiveElement {
+    fn default() -> Self {
+        Self::Group(0)
     }
 }

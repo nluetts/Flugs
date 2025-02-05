@@ -82,7 +82,7 @@ impl super::Plotter {
         {
             let should_modify = modifier_down && drag.length() > 0.0;
             if should_modify {
-                self.manipulate_file(selected_file, modifiers, spans, drag);
+                self.manipulate_file(selected_file, modifiers, drag);
             }
         }
     }

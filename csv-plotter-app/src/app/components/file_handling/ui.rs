@@ -104,14 +104,15 @@ impl FileHandler {
                             continue;
                         }
                     };
-                    let file_label_txt = match render_file_label(file) {
+                    let file_label_txt = match file_name_layout(file) {
                         Some(value) => value,
                         None => {
                             log::warn!("could not render file label for fid {fid:?}");
                             continue;
                         }
                     };
-                    if ui.label(file_label_txt).clicked() {
+                    let label = egui::Label::new(file_label_txt).truncate();
+                    if ui.add(label).clicked() {
                         self.active_element = ActiveElement::File(*fid, gid);
                     }
                 }
@@ -159,16 +160,25 @@ impl FileHandler {
             None => return,
         };
 
+        let label = egui::Label::new(file.file_name()).truncate();
+        let mut label = ui.add(label);
+        label.id = "file_setting_name_label".into();
+        // Identifier and delete button.
+        ui.label(format!("(ID {})", fid.0));
+        if ui.small_button("🗑").clicked() {
+            event_queue.queue_event(Box::new(RemoveFile::new(fid, gid)));
+        }
+
         // Display error if csv could not be parsed.
         if let Err(error) = file.csv_data.value() {
             ui.label(error).highlight();
         };
-        // Text box to change alias.
-        // ui.horizontal(|ui| {
-        // TODO: This gives a runtime error in the ui
-        // ui.label("alias: ");
-        ui.text_edit_singleline(&mut file.properties.alias);
-        // });
+
+        ui.horizontal(|ui| {
+            let label = ui.label("Alias: ");
+            ui.text_edit_singleline(&mut file.properties.alias)
+                .labelled_by(label.id);
+        });
 
         // Menu to move/copy file to other group.
         let mut target: (Option<usize>, bool) = (None, false);
@@ -205,33 +215,23 @@ impl FileHandler {
             }
             (None, _) => (),
         }
-
-        // Identifier and delete button.
-        ui.label(format!("(ID {})", fid.0));
-        if ui.small_button("🗑").clicked() {
-            event_queue.queue_event(Box::new(RemoveFile::new(fid, gid)));
-        }
     }
 }
 
-fn render_file_label(file: &mut File) -> Option<LayoutJob> {
-    let mut file_label_txt =
-        if let Some(name) = file.path.file_name().and_then(|name| name.to_str()) {
-            if file.csv_data.value().is_ok() {
-                egui::text::LayoutJob::single_section(name.to_owned(), egui::TextFormat::default())
-            } else {
-                // Make file label red if parsin CSV data failed.
-                egui::text::LayoutJob::simple_singleline(
-                    name.to_owned(),
-                    FontId::default(),
-                    egui::Color32::RED,
-                )
-            }
+fn file_name_layout(file: &mut File) -> Option<LayoutJob> {
+    let file_label_txt = if let Some(name) = file.path.file_name().and_then(|name| name.to_str()) {
+        if file.csv_data.value().is_ok() {
+            egui::text::LayoutJob::single_section(name.to_owned(), egui::TextFormat::default())
         } else {
-            return None;
-        };
-    // TODO: The label is not yet correctly shortened
-    file_label_txt.wrap.max_width = 800.0;
-    file_label_txt.wrap.max_rows = 1;
+            // Make file label red if parsin CSV data failed.
+            egui::text::LayoutJob::simple_singleline(
+                name.to_owned(),
+                FontId::default(),
+                egui::Color32::RED,
+            )
+        }
+    } else {
+        return None;
+    };
     Some(file_label_txt)
 }

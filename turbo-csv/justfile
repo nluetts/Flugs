@@ -1,4 +1,4 @@
 default:
-    RUST_LOG=debug cargo test --lib test_lex_negative_float_single_line -- --nocapture
+    RUST_LOG=debug cargo test --lib test_lex_scientific_multi_line -- --nocapture
 test:
-    RUST_LOG=turbo_csv::test=debug cargo test --lib test_lex_integer_single_line_invalid -- --nocapture
+    RUST_LOG=turbo_csv::test=debug cargo test --lib test_lex_scientific_multi_line -- --nocapture

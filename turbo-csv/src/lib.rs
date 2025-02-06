@@ -66,6 +66,9 @@ impl Lexer {
             }
             self.cur_state = State::StartOfLine;
             let mut chrs = line.chars().enumerate().peekable();
+            // TODO: This counter is currently handled poorly: sometimes it is
+            // advanved by the `emit_token` function, sometimes directly in the
+            // `while let` loop. This should be unified.
             let mut i = 0;
             while let Some((j, chr)) = chrs.next() {
                 match self.cur_state {
@@ -80,12 +83,29 @@ impl Lexer {
                             // We have to emit the previous integer token.
                             tokens.push(emit_token(&line, &mut i, j, self.cur_state));
                             self.cur_state = State::OnDelimiter;
-                            // tokens.push(emit_token(&line, &mut i, j + 1, self.cur_state));
+                            tokens.push(emit_token(&line, &mut i, j + 1, self.cur_state));
                         }
 
                         '.' => {
                             self.cur_state = State::InFloat;
                         }
+
+                        'e' | 'E' => match chrs.peek() {
+                            Some((_, chr)) => match chr {
+                                '0'..='9' => {
+                                    self.cur_state = State::InScientific;
+                                }
+                                '-' | '+' => self.cur_state = State::MaybeScientific,
+                                _ => {
+                                    invalid(&line, i, j, line_no, self.cur_state);
+                                    break;
+                                }
+                            },
+                            None => {
+                                invalid(&line, i, j, line_no, self.cur_state);
+                                break;
+                            }
+                        },
 
                         _ => {
                             invalid(&line, i, j, line_no, self.cur_state);
@@ -102,7 +122,7 @@ impl Lexer {
                             // We have to emit the previous integer token.
                             tokens.push(emit_token(&line, &mut i, j, self.cur_state));
                             self.cur_state = State::OnDelimiter;
-                            // tokens.push(emit_token(&line, &mut i, j + 1, self.cur_state));
+                            tokens.push(emit_token(&line, &mut i, j + 1, self.cur_state));
                         }
 
                         'e' | 'E' => match chrs.peek() {
@@ -113,9 +133,13 @@ impl Lexer {
                                 '-' | '+' => self.cur_state = State::MaybeScientific,
                                 _ => {
                                     invalid(&line, i, j, line_no, self.cur_state);
+                                    break;
                                 }
                             },
-                            None => invalid(&line, i, j, line_no, self.cur_state),
+                            None => {
+                                invalid(&line, i, j, line_no, self.cur_state);
+                                break;
+                            }
                         },
 
                         _ => {
@@ -126,11 +150,12 @@ impl Lexer {
 
                     State::OnDelimiter => match chr {
                         ' ' | ',' | '\t' | ';' => {
-                            tokens.push(emit_token(&line, &mut i, j, self.cur_state));
+                            tokens.push(emit_token(&line, &mut i, j + 1, self.cur_state));
                         }
 
                         '0'..='9' => {
                             self.cur_state = State::InInteger;
+                            i += 1;
                         }
 
                         '+' | '-' => {
@@ -147,6 +172,7 @@ impl Lexer {
                                     log::warn!("ignoring trailing {} in line {}", chr, line_no);
                                 }
                             }
+                            i += 1;
                         }
 
                         _ => {
@@ -160,7 +186,10 @@ impl Lexer {
                             self.cur_state = State::InInteger;
                         }
                         // With this we trim trailing whitespace.
-                        ' ' | '\t' => (),
+                        ' ' | '\t' => {
+                            // Otherwise, `i` is advanced by `emit_token`.
+                            i += 1;
+                        }
                         '+' | '-' => {
                             match chrs.peek() {
                                 Some((_, '0'..'9')) => self.cur_state = State::InInteger,
@@ -194,7 +223,7 @@ impl Lexer {
                             // We have to emit the previous integer token.
                             tokens.push(emit_token(&line, &mut i, j, self.cur_state));
                             self.cur_state = State::OnDelimiter;
-                            // tokens.push(emit_token(&line, &mut i, j + 1, self.cur_state));
+                            tokens.push(emit_token(&line, &mut i, j + 1, self.cur_state));
                         }
                         _ => {
                             invalid(line, i, j, line_no, State::InFloat);
@@ -265,14 +294,10 @@ impl Lexer {
 /// Panics if text handed cannot be parsed according to the state.
 /// This should only happen if there is an unconsidered edge case
 /// or a logic error.
+///
+/// This function also advances the counter `i`!
 fn emit_token<'a>(raw_text: &'a str, i: &mut usize, j: usize, state: State) -> Token<'a> {
     let fail_msg = "token emitter was handed invalid raw text";
-    log::debug!(
-        "emitting token for {}, i = {}, j = {}",
-        &raw_text[*i..j],
-        i,
-        j
-    );
     let token = match state {
         State::InComment => Token::Comment(&raw_text[*i..j]),
         State::OnDelimiter => Token::Delimiter(raw_text[*i..j].chars().nth(0).expect(&fail_msg)),
@@ -283,7 +308,12 @@ fn emit_token<'a>(raw_text: &'a str, i: &mut usize, j: usize, state: State) -> T
         // StartOfLine is handeled in `walk_file` separately.
         State::MaybeFloat | State::MaybeScientific | State::StartOfLine => unreachable!(),
     };
-    *i = j;
+    log::debug!("emitting {:?}, i = {}, j = {}", token, i, j);
+    if state == State::OnDelimiter {
+        *i = j - 1;
+    } else {
+        *i = j;
+    }
     token
 }
 
@@ -291,16 +321,18 @@ fn invalid(raw_text: &str, i: usize, j: usize, line_no: usize, state: State) {
     let parse_as = match state {
         State::OnDelimiter => "delimiter",
         State::InInteger => "integer",
-        State::InFloat | State::InScientific => "float",
+        State::InFloat | State::InScientific | State::MaybeFloat | State::MaybeScientific => {
+            "float"
+        }
         // This function should never be used in these states.
-        State::StartOfLine | State::InComment | State::MaybeFloat | State::MaybeScientific => {
+        State::StartOfLine | State::InComment => {
             unreachable!()
         }
     };
     log::warn!(
         "unable to parse '{}' in line {}, position {} as {}, skipping line",
         &raw_text[i..j + 1],
-        line_no + 1,
+        line_no,
         j + 1,
         parse_as,
     );
@@ -424,5 +456,22 @@ mod test {
         assert_eq!(tokens.next(), Some(Token::Delimiter(';')));
         assert_eq!(tokens.next(), Some(Token::Newline));
         assert_eq!(tokens.next(), Some(Token::Float(0.0)));
+    }
+
+    #[test]
+    fn test_full() {
+        init();
+
+        let input = r#"This is a header without comment char.
+        # This is a comment
+        2 34 1.2
+        +1e-3 0.000213 1232e-3
+        # Another comment
+        23 43 this is invalid
+23.ef this is invalid"#;
+
+        let mut lexer = Lexer::from_string(input.to_string());
+
+        log::debug!("{:?}", lexer.walk_file());
     }
 }

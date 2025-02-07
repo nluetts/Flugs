@@ -671,6 +671,7 @@ dependencies = [
  "rfd",
  "serde",
  "serde_json",
+ "turbo-csv",
 ]
 
 [[package]]

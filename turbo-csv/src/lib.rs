@@ -1,9 +1,8 @@
 #![warn(clippy::all, rust_2018_idioms)]
-#![allow(unused)]
 
-use std::{collections::HashMap, path::Path, str::FromStr};
+use std::{collections::HashMap, path::Path};
 
-struct Parser {
+pub struct Parser {
     lexer: Lexer,
 }
 
@@ -34,68 +33,123 @@ enum Token<'a> {
 }
 
 impl Parser {
-    fn from_path(path: &Path) -> Result<Self, std::io::Error> {
+    pub fn from_path(path: &Path) -> Result<Self, std::io::Error> {
         Ok(Self {
             lexer: Lexer::from_path(path)?,
         })
     }
 
+    #[allow(unused)]
     fn from_string(raw_input: String) -> Self {
         Self {
             lexer: Lexer::from_string(raw_input),
         }
     }
 
-    fn parse_float(mut self) -> Vec<Vec<f64>> {
-        let seen_delimiter = false;
-        let mut raw_results = Vec::new();
-        let mut result: Vec<Vec<f64>> = Vec::new();
+    pub fn parse_float(mut self) -> (String, Vec<Vec<f64>>) {
+        // We collect columns into this vector.
+        let mut data: Vec<Vec<f64>> = Vec::new();
+        let mut comments: Vec<&str> = Vec::new();
+
+        // These variables are used to keep track of the state of the parser.
+        let mut delimiter: Option<Token<'_>> = None;
+        let mut max_column_idx = 0;
         let mut current_column_idx = 0;
-        let mut last_delimiter: Option<Token<'_>> = None;
+
+        // For each line, we collect numbers in a this hashmap which maps from
+        // column index to number. This way, we can fill missing entries in
+        // columns which did not get a value from the current line (with NaN).
         let mut current_row: HashMap<usize, f64> = HashMap::with_capacity(10);
+
         let mut tokens = self.lexer.walk_file().into_iter();
+        let mut line_valid = true;
         while let Some(tok) = tokens.next() {
-            dbg!(&tok);
-            dbg!(&last_delimiter);
+            // dbg!("##################");
+            // dbg!(
+            //     &delimiter,
+            //     &max_column_idx,
+            //     &current_column_idx,
+            //     &current_row,
+            //     &result
+            // );
             match tok {
                 Token::Integer(x) => {
                     current_row.insert(current_column_idx, x as f64);
                 }
                 Token::Float(x) => {
-                    current_row.insert(current_column_idx, x as f64);
+                    current_row.insert(current_column_idx, x);
                 }
-                Token::Delimiter(c) => match last_delimiter {
+                Token::Delimiter(c) => match delimiter {
                     Some(Token::Delimiter(ld)) => {
+                        // If we already saw this delimiter, we assume a new
+                        // column starts here.
                         if ld == c {
                             current_column_idx += 1;
+                            // If the current column index goes beyond the
+                            // currently known maximum number of columns, we
+                            // have to add another column.
+                            if current_column_idx > max_column_idx {
+                                max_column_idx = current_column_idx;
+                            }
                         } else {
+                            // If we already saw a delimiter and the current one
+                            // is different, we reject the current line.
                             log::warn!("mixed delimiters found, skipping line");
-                            while let Some(tok) = tokens.next() {
-                                if tok == Token::Newline {
-                                    // TODO: Can we not replicate this here?
-                                    current_column_idx = 0;
-                                    current_row.clear();
-                                    break;
+                            loop {
+                                match tokens.next() {
+                                    Some(Token::Newline) | None => {
+                                        line_valid = false;
+                                        break;
+                                    }
+                                    Some(_) => {}
                                 }
                             }
+                            current_column_idx = 0;
+                            current_row.clear();
                         }
                     }
                     None => {
-                        last_delimiter = Some(Token::Delimiter(c));
+                        delimiter = Some(Token::Delimiter(c));
                         current_column_idx += 1;
                     }
                     Some(_) => unreachable!(),
                 },
-                Token::Comment(_) => (),
+                Token::Comment(c) => comments.push(c),
                 Token::Newline => {
-                    raw_results.push(current_row.clone());
+                    if !current_row.is_empty() && line_valid {
+                        #[allow(clippy::needless_range_loop)]
+                        for col_idx in 0..=max_column_idx {
+                            if data.get(col_idx).is_none() {
+                                add_column(&mut data);
+                            }
+                        }
+                        #[allow(clippy::needless_range_loop)]
+                        for col_idx in 0..=max_column_idx {
+                            let value = current_row.get(&col_idx).unwrap_or(&f64::NAN);
+                            data[col_idx].push(*value);
+                        }
+                    }
                     current_column_idx = 0;
                     current_row.clear();
+                    line_valid = true;
                 }
             }
         }
-        dbg!(raw_results);
-        vec![vec![1.0]]
+        let comments = comments.join("\n");
+        (comments, data)
+    }
+}
+
+fn add_column(result: &mut Vec<Vec<f64>>) {
+    if let Some(col) = result.first() {
+        let n_rows = col.len();
+        // If we already have columns, we add a
+        // new column and fill it with NaN so all
+        // columns have the same length.
+        result.push(vec![f64::NAN; n_rows])
+    } else {
+        // If there is no column yet, we add one.
+        result.push(Vec::new());
     }
 }
 
@@ -115,9 +169,8 @@ impl Lexer {
         Self { raw_input }
     }
 
-    fn walk_file<'a>(&'a mut self) -> Vec<Token<'a>> {
+    fn walk_file(&mut self) -> Vec<Token<'_>> {
         let raw_input = &self.raw_input;
-        log::debug!("raw_input = {}", raw_input);
 
         // DEBUG: This parallel version does not seem to keep line order correctly.
         // Sometimes the tests pass, sometimes not. Race condition?
@@ -153,7 +206,6 @@ impl Lexer {
     }
 
     fn lex_line<'a>(&'a self, line_no: usize, line: &'a str, tokens: &mut Vec<Token<'a>>) {
-        log::debug!("line {}: '{}'", line_no, line);
         if line_no > 0 {
             tokens.push(Token::Newline);
         }
@@ -176,9 +228,9 @@ impl Lexer {
 
                     ' ' | ',' | '\t' | ';' => {
                         // We have to emit the previous integer token.
-                        tokens.push(emit_token(&line, &mut i, j, cur_state));
+                        tokens.push(emit_token(line, &mut i, j, cur_state));
                         cur_state = State::OnDelimiter;
-                        tokens.push(emit_token(&line, &mut i, j + 1, cur_state));
+                        tokens.push(emit_token(line, &mut i, j + 1, cur_state));
                     }
 
                     '.' => {
@@ -192,18 +244,18 @@ impl Lexer {
                             }
                             '-' | '+' => cur_state = State::MaybeScientific,
                             _ => {
-                                invalid(&line, i, j, line_no, cur_state);
+                                invalid(line, i, j, line_no, cur_state);
                                 break;
                             }
                         },
                         None => {
-                            invalid(&line, i, j, line_no, cur_state);
+                            invalid(line, i, j, line_no, cur_state);
                             break;
                         }
                     },
 
                     _ => {
-                        invalid(&line, i, j, line_no, cur_state);
+                        invalid(line, i, j, line_no, cur_state);
                         break;
                     }
                 },
@@ -215,9 +267,9 @@ impl Lexer {
 
                     ' ' | ',' | '\t' | ';' => {
                         // We have to emit the previous integer token.
-                        tokens.push(emit_token(&line, &mut i, j, cur_state));
+                        tokens.push(emit_token(line, &mut i, j, cur_state));
                         cur_state = State::OnDelimiter;
-                        tokens.push(emit_token(&line, &mut i, j + 1, cur_state));
+                        tokens.push(emit_token(line, &mut i, j + 1, cur_state));
                     }
 
                     'e' | 'E' => match chrs.peek() {
@@ -227,25 +279,25 @@ impl Lexer {
                             }
                             '-' | '+' => cur_state = State::MaybeScientific,
                             _ => {
-                                invalid(&line, i, j, line_no, cur_state);
+                                invalid(line, i, j, line_no, cur_state);
                                 break;
                             }
                         },
                         None => {
-                            invalid(&line, i, j, line_no, cur_state);
+                            invalid(line, i, j, line_no, cur_state);
                             break;
                         }
                     },
 
                     _ => {
-                        invalid(&line, i, j, line_no, cur_state);
+                        invalid(line, i, j, line_no, cur_state);
                         break;
                     }
                 },
 
                 State::OnDelimiter => match chr {
                     ' ' | ',' | '\t' | ';' => {
-                        tokens.push(emit_token(&line, &mut i, j + 1, cur_state));
+                        tokens.push(emit_token(line, &mut i, j + 1, cur_state));
                     }
 
                     '0'..='9' => {
@@ -255,7 +307,7 @@ impl Lexer {
 
                     '+' | '-' => {
                         match chrs.peek() {
-                            Some((_, '0'..'9')) => cur_state = State::InInteger,
+                            Some((_, '0'..='9')) => cur_state = State::InInteger,
                             Some((_, '.')) => cur_state = State::MaybeFloat,
                             Some(_) => {
                                 invalid(line, i, j, line_no, cur_state);
@@ -287,7 +339,7 @@ impl Lexer {
                     }
                     '+' | '-' => {
                         match chrs.peek() {
-                            Some((_, '0'..'9')) => cur_state = State::InInteger,
+                            Some((_, '0'..='9')) => cur_state = State::InInteger,
                             Some((_, '.')) => cur_state = State::MaybeFloat,
                             Some(_) => cur_state = State::InComment,
                             None => {
@@ -302,7 +354,7 @@ impl Lexer {
                     }
                     ',' | ';' => {
                         cur_state = State::OnDelimiter;
-                        tokens.push(emit_token(&line, &mut i, j + 1, cur_state));
+                        tokens.push(emit_token(line, &mut i, j + 1, cur_state));
                     }
                     _ => {
                         cur_state = State::InComment;
@@ -316,9 +368,9 @@ impl Lexer {
 
                     ' ' | ',' | '\t' | ';' => {
                         // We have to emit the previous integer token.
-                        tokens.push(emit_token(&line, &mut i, j, cur_state));
+                        tokens.push(emit_token(line, &mut i, j, cur_state));
                         cur_state = State::OnDelimiter;
-                        tokens.push(emit_token(&line, &mut i, j + 1, cur_state));
+                        tokens.push(emit_token(line, &mut i, j + 1, cur_state));
                     }
                     _ => {
                         invalid(line, i, j, line_no, State::InFloat);
@@ -326,15 +378,13 @@ impl Lexer {
                     }
                 },
 
-                State::InComment => match chr {
-                    // If we are in a comment, we accept all further
-                    // characters (the line end will be recognized
-                    // automatically by the outer loop).
-                    _ => (),
-                },
+                // If we are in a comment, we accept all further
+                // characters (the line end will be recognized
+                // automatically by the outer loop).
+                State::InComment => {}
 
                 State::MaybeFloat => match chr {
-                    '0'..'9' => cur_state = State::InFloat,
+                    '0'..='9' => cur_state = State::InFloat,
                     // We stay in state MaybeFloat and check next character
                     // in next iteration.
                     '.' => (),
@@ -354,20 +404,13 @@ impl Lexer {
                     }
                 },
             }
-            log::debug!(
-                "char '{}', i = {}, j = {}, state = {:?}",
-                chr,
-                i,
-                j,
-                cur_state
-            );
 
             // If this is the end of the line, we may need to emit the
             // current item.
             if chrs.peek().is_none() {
                 match cur_state {
                     State::InInteger | State::InFloat | State::InScientific | State::InComment => {
-                        tokens.push(emit_token(&line, &mut i, j + 1, cur_state));
+                        tokens.push(emit_token(line, &mut i, j + 1, cur_state));
                     }
                     State::MaybeFloat | State::MaybeScientific => {
                         invalid(line, i, j, line_no, State::InFloat);
@@ -391,15 +434,14 @@ fn emit_token<'a>(raw_text: &'a str, i: &mut usize, j: usize, state: State) -> T
     let fail_msg = "token emitter was handed invalid raw text";
     let token = match state {
         State::InComment => Token::Comment(&raw_text[*i..j]),
-        State::OnDelimiter => Token::Delimiter(raw_text[*i..j].chars().nth(0).expect(&fail_msg)),
-        State::InInteger => Token::Integer(raw_text[*i..j].parse::<i64>().expect(&fail_msg)),
-        State::InFloat => Token::Float(raw_text[*i..j].parse::<f64>().expect(&fail_msg)),
-        State::InScientific => Token::Float(raw_text[*i..j].parse::<f64>().expect(&fail_msg)),
+        State::OnDelimiter => Token::Delimiter(raw_text[*i..j].chars().next().expect(fail_msg)),
+        State::InInteger => Token::Integer(raw_text[*i..j].parse::<i64>().expect(fail_msg)),
+        State::InFloat => Token::Float(raw_text[*i..j].parse::<f64>().expect(fail_msg)),
+        State::InScientific => Token::Float(raw_text[*i..j].parse::<f64>().expect(fail_msg)),
         // MaybeStates should never emit a token!
         // StartOfLine is handeled in `walk_file` separately.
         State::MaybeFloat | State::MaybeScientific | State::StartOfLine => unreachable!(),
     };
-    log::debug!("emitting {:?}, i = {}, j = {}", token, i, j);
     if state == State::OnDelimiter {
         *i = j - 1;
     } else {
@@ -431,6 +473,7 @@ fn invalid(raw_text: &str, i: usize, j: usize, line_no: usize, state: State) {
     log::warn!("{}", aux_msg);
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 
@@ -454,20 +497,9 @@ mod test {
         let mut lexer = Lexer::from_string("+220;-210;".into());
 
         let tokens = lexer.walk_file();
-        log::debug!("tokens: {:?}", &tokens);
         assert_eq!(tokens[0], Token::Integer(220));
         assert_eq!(tokens[1], Token::Delimiter(';'));
         assert_eq!(tokens[2], Token::Integer(-210));
-    }
-
-    #[test]
-    fn test_lex_integer_single_line_invalid() {
-        init();
-        let mut lexer = Lexer::from_string("220;231390823a;".into());
-
-        let tokens = lexer.walk_file();
-        log::debug!("tokens: {:?}", &tokens);
-        // assert_eq!(tokens[0], Token::Invalid(""));
     }
 
     #[test]
@@ -476,7 +508,6 @@ mod test {
         let mut lexer = Lexer::from_string("220;210;\n152;62;".into());
 
         let tokens = lexer.walk_file();
-        log::debug!("tokens: {:?}", &tokens);
         assert_eq!(tokens[2], Token::Integer(210));
         assert_eq!(tokens[3], Token::Delimiter(';'));
         assert_eq!(tokens[4], Token::Newline);
@@ -488,7 +519,6 @@ mod test {
         let mut lexer = Lexer::from_string("22.0;".into());
 
         let tokens = lexer.walk_file();
-        log::debug!("tokens: {:?}", &tokens);
         assert_eq!(tokens[0], Token::Float(22.0));
         assert_eq!(tokens[1], Token::Delimiter(';'));
     }
@@ -499,7 +529,6 @@ mod test {
         let mut lexer = Lexer::from_string("-22.0;+2.10;".into());
 
         let tokens = lexer.walk_file();
-        log::debug!("tokens: {:?}", &tokens);
         assert_eq!(tokens[0], Token::Float(-22.0));
         assert_eq!(tokens[1], Token::Delimiter(';'));
         assert_eq!(tokens[2], Token::Float(2.10));
@@ -507,7 +536,6 @@ mod test {
         let mut lexer = Lexer::from_string("+.220;-.10;".into());
 
         let tokens = lexer.walk_file();
-        log::debug!("tokens: {:?}", &tokens);
         assert_eq!(tokens[0], Token::Float(0.22));
         assert_eq!(tokens[1], Token::Delimiter(';'));
         assert_eq!(tokens[2], Token::Float(-0.1));
@@ -519,7 +547,6 @@ mod test {
         let mut lexer = Lexer::from_string("22.0;231340298.0;\n0.00023;1.0;".into());
 
         let tokens = lexer.walk_file();
-        log::debug!("tokens: {:?}", &tokens);
         let mut tokens = tokens.into_iter();
         assert_eq!(tokens.next(), Some(Token::Float(22.0)));
         assert_eq!(tokens.next(), Some(Token::Delimiter(';')));
@@ -537,7 +564,6 @@ mod test {
         let mut lexer = Lexer::from_string("22.0e-1;".into());
 
         let tokens = lexer.walk_file();
-        log::debug!("tokens: {:?}", &tokens);
         assert_eq!(tokens[0], Token::Float(2.20));
         assert_eq!(tokens[1], Token::Delimiter(';'));
     }
@@ -548,29 +574,11 @@ mod test {
         let mut lexer = Lexer::from_string("22.e-1;\n0.0e-3;;;".into());
 
         let tokens = lexer.walk_file();
-        log::debug!("tokens: {:?}", &tokens);
         let mut tokens = tokens.into_iter();
         assert_eq!(tokens.next(), Some(Token::Float(2.20)));
         assert_eq!(tokens.next(), Some(Token::Delimiter(';')));
         assert_eq!(tokens.next(), Some(Token::Newline));
         assert_eq!(tokens.next(), Some(Token::Float(0.0)));
-    }
-
-    #[test]
-    fn test_full() {
-        init();
-
-        let input = r#"This is a header without comment char.
-        # This is a comment
-        2 34 1.2
-        +1e-3 0.000213 1232e-3
-        # Another comment
-        23 43 this is invalid
-23.ef this is invalid"#;
-
-        let mut lexer = Lexer::from_string(input.to_string());
-
-        log::debug!("{:?}", lexer.walk_file());
     }
 
     #[test]
@@ -581,12 +589,37 @@ mod test {
         # This is a comment
         2 34 1.2
         +1e-3 0.000213 1232e-3
-        # Another comment
+        34 -2 3
+        0.1 +2e-2 3.0001
         23.ef this is invalid"#;
 
         let parser = Parser::from_string(input.into());
+        let expected = vec![
+            vec![2.0, 0.001, 34.0, 0.1],
+            vec![34.0, 0.000213, -2.0, 0.02],
+            vec![1.2, 1.232, 3.0, 3.0001],
+        ];
 
-        let result = parser.parse_float();
-        assert_eq!(result, vec![vec![1.0]])
+        let (_, result) = parser.parse_float();
+        assert_eq!(result, expected);
+
+        let input = r#"This is a header without comment char.
+        # This is a comment
+        2;34;1.2
+        +1e-3;0.000213;1232e-3
+        34;-2;3
+        0.1;+2e-2;3.0001
+        23.ef this is invalid"#;
+
+        let parser = Parser::from_string(input.into());
+        let expected = vec![
+            vec![2.0, 0.001, 34.0, 0.1],
+            vec![34.0, 0.000213, -2.0, 0.02],
+            vec![1.2, 1.232, 3.0, 3.0001],
+        ];
+
+        let (comment, result) = parser.parse_float();
+        println!("{}", comment);
+        assert_eq!(result, expected);
     }
 }

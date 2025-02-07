@@ -122,8 +122,7 @@ fn render_file_form(
             ui.horizontal(|ui| {
                 egui::ComboBox::new((gid, fid, "move"), "Move to Group").show_ui(ui, |ui| {
                     ui.selectable_value(&mut target, (None, false), "");
-                    for i in 0..10 {
-                        let grp_name = &group_names[i];
+                    for (i, grp_name) in group_names.iter().enumerate() {
                         let label = if grp_name.is_empty() {
                             format!("<insert new at {}>", i + 1)
                         } else {
@@ -134,8 +133,7 @@ fn render_file_form(
                 });
                 egui::ComboBox::new((gid, fid, "copy"), "Copy to Group").show_ui(ui, |ui| {
                     ui.selectable_value(&mut target, (None, false), "");
-                    for i in 0..10 {
-                        let grp_name = &group_names[i];
+                    for (i, grp_name) in group_names.iter().enumerate() {
                         let label = if grp_name.is_empty() {
                             format!("<insert new at {}>", i + 1)
                         } else {

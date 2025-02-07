@@ -108,11 +108,10 @@ impl super::Plotter {
 
             // Plot the data.
             let color = auto_color(Into::<i32>::into(*fid));
-            let width;
-            if self.selected_fid.is_some_and(|sfid| sfid == *fid) {
-                width = 2.5;
+            let width = if self.selected_fid.is_some_and(|sfid| sfid == *fid) {
+                2.5
             } else {
-                width = 1.0;
+                1.0
             };
             let name = if file.properties.alias.is_empty() {
                 format!("{} ({})", file.file_name(), group_name)

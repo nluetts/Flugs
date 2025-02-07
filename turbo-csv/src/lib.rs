@@ -64,14 +64,6 @@ impl Parser {
         let mut tokens = self.lexer.walk_file().into_iter();
         let mut line_valid = true;
         while let Some(tok) = tokens.next() {
-            // dbg!("##################");
-            // dbg!(
-            //     &delimiter,
-            //     &max_column_idx,
-            //     &current_column_idx,
-            //     &current_row,
-            //     &result
-            // );
             match tok {
                 Token::Integer(x) => {
                     current_row.insert(current_column_idx, x as f64);
@@ -199,7 +191,6 @@ impl Lexer {
         for (line_no, line) in raw_input.lines().enumerate() {
             self.lex_line(line_no, line, &mut tokens);
         }
-        dbg!(&tokens);
         tokens
     }
 

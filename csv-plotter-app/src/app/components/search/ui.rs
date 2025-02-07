@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::Path};
 
 use egui::{text::LayoutJob, Color32, FontId, InputState, Label, Pos2, TextFormat};
 
-use crate::app::DynRequestSender;
+use crate::{app::DynRequestSender, backend_state::CSVData};
 
 impl super::Search {
     pub fn render(
@@ -115,7 +115,7 @@ impl super::Search {
                 path: fp,
                 matched_indices: indices,
                 assigned_group: group_id,
-                parsed_data: _csv_data,
+                parsed_data: csv_data,
             } in self.matches.value_mut()
             {
                 if indices.is_empty() {
@@ -125,13 +125,32 @@ impl super::Search {
                 ui.horizontal(|ui| {
                     let path_label = Label::new(render_match_label(fp, indices)).wrap();
 
-                    if ui.add(path_label).hovered() {
-                        // if we hover a file path, we loose focus on search phrase
+                    ui.add(path_label).on_hover_ui_at_pointer(|ui| {
+                        ui.label("press '0' to '9' to add to group, <enter> to accept");
+                        // If we hover a file path, we loose focus on search phrase
                         // input so we do not put in the following keyboard events
                         // as search phrase; however, if we just opened the search
-                        // popup and do not move the mouse we keep the focus
+                        // popup and do not move the mouse we keep the focus.
                         if ctx.input(|i| i.pointer.is_moving()) {
                             phrase_input.surrender_focus()
+                        // If we do not move the mouse and did not try yet, we
+                        // try parsing the current file.
+                        } else if let None = csv_data {
+                            if let Ok(data) = CSVData::from_path(&self.search_path.value().join(fp))
+                            {
+                                *csv_data = Some(data);
+                            };
+                        } else if let Some(csv_data) = csv_data {
+                            ui.separator();
+                            ui.label("preview:");
+                            egui_plot::Plot::new("Plot").view_aspect(4.0 / 3.0).show(
+                                ui,
+                                |plot_ui| {
+                                    plot_ui.line(egui_plot::Line::new(
+                                        csv_data.get_cache().data.to_owned(),
+                                    ));
+                                },
+                            );
                         };
 
                         let (input_active, numkey_released) =
@@ -150,7 +169,7 @@ impl super::Search {
                                 }
                             }
                         }
-                    }
+                    });
                     if let Some(grp) = group_id {
                         let text = format!("({})", grp);
                         let text = LayoutJob::simple(text, FontId::default(), Color32::RED, 5.0);

@@ -157,17 +157,23 @@ impl FileHandler {
     ) {
         let file = match self.registry.get_mut(&fid) {
             Some(file) => file,
-            None => return,
+            None => {
+                log::warn!("Requested file settings for a file ID that is missing in registry.");
+                return;
+            }
         };
 
-        let label = egui::Label::new(file.file_name()).truncate();
-        let mut label = ui.add(label);
-        label.id = "file_setting_name_label".into();
-        // Identifier and delete button.
-        ui.label(format!("(ID {})", fid.0));
-        if ui.small_button("🗑").clicked() {
-            event_queue.queue_event(Box::new(RemoveFile::new(fid, gid)));
-        }
+        ui.push_id(file.file_name(), |ui| {
+            ui.horizontal(|ui| {
+                let label = egui::Label::new(file.file_name()).truncate();
+                ui.add(label);
+                // Identifier and delete button.
+                ui.label(format!("(ID {})", fid.0));
+                if ui.small_button("🗑").clicked() {
+                    event_queue.queue_event(Box::new(RemoveFile::new(fid, gid)));
+                }
+            })
+        });
 
         // Display error if csv could not be parsed.
         if let Err(error) = file.csv_data.value() {
@@ -179,6 +185,21 @@ impl FileHandler {
             ui.text_edit_singleline(&mut file.properties.alias)
                 .labelled_by(label.id);
         });
+
+        ui.label("X-Offset: ");
+        let dragv = egui::DragValue::new(&mut file.properties.xoffset);
+        ui.add(dragv);
+        ui.label("Y-Offset: ");
+        let dragv = egui::DragValue::new(&mut file.properties.yoffset);
+        ui.add(dragv);
+        ui.label("Y-Scale: ");
+        let dragv = egui::DragValue::new(&mut file.properties.yscale);
+        ui.add(dragv);
+
+        ui.label("Comment:");
+        egui::TextEdit::multiline(&mut file.properties.comment)
+            .hint_text("Type a comment.")
+            .show(ui);
 
         // Menu to move/copy file to other group.
         let mut target: (Option<usize>, bool) = (None, false);

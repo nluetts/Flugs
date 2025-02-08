@@ -143,14 +143,14 @@ impl super::Search {
                         } else if let Some(csv_data) = csv_data {
                             ui.separator();
                             ui.label("preview:");
-                            egui_plot::Plot::new("Plot").view_aspect(4.0 / 3.0).show(
-                                ui,
-                                |plot_ui| {
+                            egui_plot::Plot::new("Plot")
+                                .view_aspect(4.0 / 3.0)
+                                .show_axes(false)
+                                .show(ui, |plot_ui| {
                                     plot_ui.line(egui_plot::Line::new(
                                         csv_data.get_cache().data.to_owned(),
                                     ));
-                                },
-                            );
+                                });
                         };
 
                         let (input_active, numkey_released) =

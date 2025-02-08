@@ -37,6 +37,7 @@ pub struct FileProperties {
     pub xoffset: f64,
     pub yoffset: f64,
     pub yscale: f64,
+    pub comment: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -97,6 +98,7 @@ impl Default for FileProperties {
             xoffset: 0.0,
             yoffset: 0.0,
             yscale: 1.0,
+            comment: String::new(),
         }
     }
 }

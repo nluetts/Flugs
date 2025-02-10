@@ -1,7 +1,7 @@
 mod logic;
 mod ui;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::app::DynRequestSender;
@@ -42,7 +42,7 @@ pub struct FileProperties {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Group {
-    pub file_ids: HashSet<FileID>,
+    pub file_ids: Vec<FileID>,
     pub is_plotted: bool,
     pub name: String,
 }

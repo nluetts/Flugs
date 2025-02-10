@@ -141,14 +141,16 @@ impl AppEvent for CopyFile {
             .get_mut(to_group)
             .and_then(|grp| grp.as_mut())
         {
-            grp.file_ids.insert(fid);
+            if !grp.file_ids.contains(&fid) {
+                grp.file_ids.push(fid);
+            }
         } else {
             log::debug!("creating new group at slot {}", to_group);
             let mut grp = Group {
                 name: format!("Group ({})", to_group + 1),
                 ..Default::default()
             };
-            grp.file_ids.insert(fid);
+            grp.file_ids.push(fid);
             app.file_handler.groups[to_group] = Some(grp);
         }
         Ok(EventState::Finished)

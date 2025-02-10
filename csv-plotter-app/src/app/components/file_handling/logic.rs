@@ -68,12 +68,14 @@ impl FileHandler {
                 fid
             };
 
-            // Add the ID to the group requested by user.
+            // Add the ID to the group requested by user, if it is not already a member.
             if let Some(grp) = &mut self.groups[gid] {
-                grp.file_ids.insert(fid);
+                if !grp.file_ids.contains(&fid) {
+                    grp.file_ids.push(fid);
+                }
             } else {
-                let mut new_file_id_set = HashSet::new();
-                new_file_id_set.insert(fid);
+                let mut new_file_id_set = Vec::new();
+                new_file_id_set.push(fid);
                 let name = format!("Group ({})", gid);
                 self.groups[gid] = Some(Group {
                     file_ids: new_file_id_set,
@@ -91,18 +93,33 @@ impl FileHandler {
     ) {
         let mut item_was_removed = false;
 
-        // Just in case, we filter gid which would lead to a panic when used as index.
+        // Just in case, we filter `gid`s which would lead to a panic when used as index.
         for (gid, fid) in files_to_delete.into_iter().filter(|(gid, _)| *gid < 10) {
             let file_name = self.fid_to_filename_str(&fid).to_string();
             if let Some(grp) = &mut self.groups[gid] {
-                grp.file_ids.remove(&fid);
-                log::debug!(
-                    "removed file '{file_name}' from group {} with ID {gid:?}",
-                    grp.name
-                );
-                item_was_removed = true;
-            } else {
-                log::warn!("trying to remove file from group with ID {gid:?} which does not exist");
+                // Find index of file ID in Vec of file IDs.
+                let mut file_idx = None;
+                for (i, cfid) in grp.file_ids.iter().enumerate() {
+                    if *cfid == fid {
+                        file_idx = Some(i)
+                    }
+                }
+                // Remove if found, otherwise emit warning.
+                match file_idx {
+                    Some(idx) => {
+                        grp.file_ids.remove(idx);
+                        log::debug!(
+                            "removed file '{file_name}' from group {} with ID {gid:?}",
+                            grp.name
+                        );
+                        item_was_removed = true;
+                    }
+                    None => {
+                        log::warn!(
+                            "trying to remove file from group with ID {gid:?} which does not exist"
+                        );
+                    }
+                }
             }
         }
 

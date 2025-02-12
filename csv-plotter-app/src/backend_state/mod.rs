@@ -77,12 +77,21 @@ impl BackendAppState {
                 return false;
             }
             let fp = fp.unwrap();
-            query.split(" ").all(|q| fp.contains(q))
+            query.split(" ").all(|q| {
+                if q.starts_with("!") {
+                    !fp.contains(&q[1..])
+                } else {
+                    fp.contains(q)
+                }
+            })
         };
         let query_indices = |filename: &PathBuf| {
             let mut indices = HashSet::new();
             let fp = filename.to_str()?;
             for q in query.split(" ") {
+                if q.starts_with("!") {
+                    continue;
+                }
                 let idx = fp.find(q)?;
                 indices.extend(idx..idx + q.len());
             }

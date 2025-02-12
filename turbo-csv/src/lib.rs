@@ -61,7 +61,7 @@ impl Parser {
         // columns which did not get a value from the current line (with NaN).
         let mut current_row: HashMap<usize, f64> = HashMap::with_capacity(10);
 
-        let mut tokens = self.lexer.walk_file().into_iter();
+        let mut tokens = self.lexer.walk_file().into_iter().peekable();
         let mut line_valid = true;
         while let Some(tok) = tokens.next() {
             match tok {
@@ -74,9 +74,22 @@ impl Parser {
                 Token::Delimiter(c) => match delimiter {
                     Some(Token::Delimiter(ld)) => {
                         // If we already saw this delimiter, we assume a new
-                        // column starts here.
+                        // column starts here, if the delimiter is not a space.
                         if ld == c {
-                            current_column_idx += 1;
+                            // Whitespace has to be treated with special care, since we
+                            // may need to collapse repeated delimiters.
+                            if c != ' ' {
+                                current_column_idx += 1;
+                            } else if c == ' '
+                                // If the current delimiter is a space, we only
+                                // bump the column index if the next token is
+                                // _not_ a delimiting space.
+                                && !tokens
+                                    .peek()
+                                    .is_some_and(|tok| tok == &Token::Delimiter(' '))
+                            {
+                                current_column_idx += 1;
+                            }
                             // If the current column index goes beyond the
                             // currently known maximum number of columns, we
                             // have to add another column.

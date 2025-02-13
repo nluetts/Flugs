@@ -1,3 +1,6 @@
+default:
+	just debug
+
 build:
 	cargo build --release
 

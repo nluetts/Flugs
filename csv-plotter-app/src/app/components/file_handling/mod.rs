@@ -40,7 +40,7 @@ pub struct FileProperties {
     pub comment: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Group {
     pub file_ids: Vec<FileID>,
     pub is_plotted: bool,
@@ -106,6 +106,16 @@ impl Default for FileProperties {
 impl From<FileID> for i32 {
     fn from(val: FileID) -> Self {
         val.0 as i32
+    }
+}
+
+impl Default for Group {
+    fn default() -> Self {
+        Self {
+            file_ids: Default::default(),
+            is_plotted: true,
+            name: Default::default(),
+        }
     }
 }
 

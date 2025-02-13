@@ -53,6 +53,11 @@ impl super::Plotter {
                     let yspan = (bounds.max()[1] - bounds.min()[1]).abs();
                     (xspan, yspan)
                 };
+                self.current_plot_bounds = {
+                    let [xmin, ymin] = plot_ui.plot_bounds().min();
+                    let [xmax, ymax] = plot_ui.plot_bounds().max();
+                    [xmin, xmax, ymin, ymax]
+                }
             });
 
         // Get modifier input (we need this here already, to disallow the plot

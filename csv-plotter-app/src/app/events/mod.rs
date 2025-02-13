@@ -111,6 +111,13 @@ pub struct SaveLoadRequested {
     thread_handle: Option<JoinHandle<Option<PathBuf>>>,
 }
 
+/// Handles both, saving and loading the app state, depending on whether
+/// `should_save` is true or false.
+#[derive(new)]
+pub struct SavePlotRequested {
+    thread_handle: Option<JoinHandle<Option<PathBuf>>>,
+}
+
 // ---------------------------------------------------------------------------
 //
 //
@@ -201,6 +208,27 @@ impl AppEvent for SaveLoadRequested {
                 Err(err) => {
                     let msg = if self.should_save { "save" } else { "load" };
                     log::error!("Unable to {} file: {:?}", msg, err)
+                }
+            };
+            Ok(EventState::Finished)
+        } else {
+            Ok(EventState::Busy)
+        }
+    }
+}
+
+impl AppEvent for SavePlotRequested {
+    type App = EguiApp;
+
+    fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
+        if let Some(handle) = self.thread_handle.take_if(|handle| handle.is_finished()) {
+            match handle.join() {
+                Ok(Some(path)) => {
+                    super::components::save_svg(&app, &path);
+                }
+                Ok(None) => (),
+                Err(err) => {
+                    log::error!("Unable to save plot: {:?}", err)
                 }
             };
             Ok(EventState::Finished)

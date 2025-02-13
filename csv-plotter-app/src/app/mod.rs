@@ -6,7 +6,7 @@ use self::components::{Plotter, Search};
 use crate::app::events::EventQueue;
 use crate::{BackendAppState, ROOT_PATH};
 use app_core::backend::BackendRequest;
-use events::SaveLoadRequested;
+use events::{SaveLoadRequested, SavePlotRequested};
 use storage::{load_json, save_json};
 
 pub use crate::app::components::FileHandler;
@@ -119,6 +119,12 @@ impl eframe::App for EguiApp {
                 let event = SaveLoadRequested::new(false, Some(handle));
                 self.event_queue.queue_event(Box::new(event));
             }
+            if i.key_pressed(egui::Key::P) && i.modifiers.ctrl {
+                log::debug!("open dialog to select svg plot path");
+                let handle = std::thread::spawn(|| rfd::FileDialog::new().save_file());
+                let event = SavePlotRequested::new(Some(handle));
+                self.event_queue.queue_event(Box::new(event));
+            }
         });
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
@@ -208,6 +214,14 @@ impl EguiApp {
                         "File Settings",
                     );
                 });
+                if ui.button("Plot").clicked() {
+                    log::debug!("open dialog to select svg plot path");
+                    let handle = std::thread::spawn(|| {
+                        rfd::FileDialog::new().set_file_name("plot.svg").save_file()
+                    });
+                    let event = SavePlotRequested::new(Some(handle));
+                    self.event_queue.queue_event(Box::new(event));
+                };
 
                 ui.toggle_value(&mut self.shortcuts_modal_open, "Help (F1)");
 

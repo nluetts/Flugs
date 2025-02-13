@@ -147,7 +147,7 @@ impl AppEvent for CopyFile {
         } else {
             log::debug!("creating new group at slot {}", to_group);
             let mut grp = Group {
-                name: format!("Group ({})", to_group + 1),
+                name: format!("Group {}", to_group),
                 ..Default::default()
             };
             grp.file_ids.push(fid);

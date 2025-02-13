@@ -80,6 +80,7 @@ impl super::Search {
 
             let paths_ui_enabled = self.matches.is_up_to_date();
 
+            // Render the matched file list.
             ui.add_enabled_ui(paths_ui_enabled, |ui| {
                 self.matches_ui(ui, phrase_input, ctx);
             });
@@ -122,10 +123,12 @@ impl super::Search {
                     break;
                 }
 
-                ui.horizontal(|ui| {
-                    let path_label = Label::new(render_match_label(fp, indices)).wrap();
+                let path_label = Label::new(render_match_label(fp, indices, group_id)).wrap();
+                // This cursor will be used when hovering a label.
+                let mut cursor = egui::CursorIcon::Default;
 
-                    ui.add(path_label).on_hover_ui_at_pointer(|ui| {
+                ui.add(path_label)
+                    .on_hover_ui_at_pointer(|ui| {
                         ui.label("press '0' to '9' to add to group, <enter> to accept");
                         // If we hover a file path, we loose focus on search phrase
                         // input so we do not put in the following keyboard events
@@ -151,6 +154,7 @@ impl super::Search {
                                         csv_data.get_cache().data.to_owned(),
                                     ));
                                 });
+                            cursor = egui::CursorIcon::PointingHand;
                         };
 
                         let (input_active, numkey_released) =
@@ -169,13 +173,8 @@ impl super::Search {
                                 }
                             }
                         }
-                    });
-                    if let Some(grp) = group_id {
-                        let text = format!("({})", grp);
-                        let text = LayoutJob::simple(text, FontId::default(), Color32::RED, 5.0);
-                        ui.add(Label::new(text));
-                    }
-                });
+                    })
+                    .on_hover_cursor(cursor);
             }
         };
         egui::ScrollArea::vertical()
@@ -186,7 +185,11 @@ impl super::Search {
     }
 }
 
-fn render_match_label(fp: &mut Path, indices: &mut HashSet<usize>) -> LayoutJob {
+fn render_match_label(
+    fp: &mut Path,
+    indices: &mut HashSet<usize>,
+    group_id: &Option<usize>,
+) -> LayoutJob {
     let style_red = TextFormat::simple(FontId::default(), Color32::RED);
     let style_white = TextFormat::default();
 
@@ -194,6 +197,7 @@ fn render_match_label(fp: &mut Path, indices: &mut HashSet<usize>) -> LayoutJob 
     let fp_len = fp_str.len();
 
     let mut label_text = LayoutJob::default();
+
     let (mut start, mut end) = (0, 0);
     let mut prev_ismatch = indices.contains(&0);
 
@@ -221,6 +225,24 @@ fn render_match_label(fp: &mut Path, indices: &mut HashSet<usize>) -> LayoutJob 
             label_text.append(&fp_str[start..=i], 2.0, format);
         }
     }
+
+    // Add group label, if applicable.
+    let fmt = TextFormat::simple(FontId::default(), Color32::RED);
+    match group_id {
+        Some(1) => label_text.append("１ ", 2.0, fmt),
+        Some(2) => label_text.append("２ ", 2.0, fmt),
+        Some(3) => label_text.append("３ ", 2.0, fmt),
+        Some(4) => label_text.append("４ ", 2.0, fmt),
+        Some(5) => label_text.append("５ ", 2.0, fmt),
+        Some(6) => label_text.append("６ ", 2.0, fmt),
+        Some(7) => label_text.append("７ ", 2.0, fmt),
+        Some(8) => label_text.append("８ ", 2.0, fmt),
+        Some(9) => label_text.append("９ ", 2.0, fmt),
+        Some(0) => label_text.append("０ ", 2.0, fmt),
+        Some(_) => {}
+        None => {}
+    };
+
     label_text
 }
 

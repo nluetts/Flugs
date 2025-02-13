@@ -76,7 +76,7 @@ impl FileHandler {
             } else {
                 let mut new_file_id_set = Vec::new();
                 new_file_id_set.push(fid);
-                let name = format!("Group ({})", gid);
+                let name = format!("Group {}", gid);
                 self.groups[gid] = Some(Group {
                     file_ids: new_file_id_set,
                     is_plotted: false,

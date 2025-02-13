@@ -35,7 +35,8 @@ impl FileHandler {
 
         let scroll_area = egui::ScrollArea::both().max_width(400.0);
 
-        egui::panel::SidePanel::left("file_and_group_tree").show(ctx, |ui| {
+        let side_panel = egui::panel::SidePanel::left("file_and_group_tree").min_width(300.0);
+        side_panel.show(ctx, |ui| {
             scroll_area.show(ui, |ui| {
                 self.left_panel(_request_tx, event_queue, ui, ctx);
             })
@@ -112,13 +113,22 @@ impl FileHandler {
                         }
                     };
                     let label = egui::Label::new(file_label_txt).truncate();
-                    if ui.add(label).clicked() {
+                    if ui
+                        .add(label)
+                        .on_hover_cursor(egui::CursorIcon::PointingHand)
+                        .clicked()
+                    {
                         self.active_element = ActiveElement::File(*fid, gid);
                     }
                 }
             });
 
-            if resp.header_response.clicked() {
+            if resp
+                .header_response
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text_at_pointer("right-click to rename")
+                .secondary_clicked()
+            {
                 self.active_element = ActiveElement::Group(gid);
             }
         }
@@ -175,6 +185,8 @@ impl FileHandler {
             })
         });
 
+        ui.separator();
+
         // Display error if csv could not be parsed.
         if let Err(error) = file.csv_data.value() {
             ui.label(error).highlight();
@@ -201,31 +213,31 @@ impl FileHandler {
             .hint_text("Type a comment.")
             .show(ui);
 
+        ui.separator();
+
         // Menu to move/copy file to other group.
         let mut target: (Option<usize>, bool) = (None, false);
-        ui.horizontal(|ui| {
-            egui::ComboBox::new((fid, "move"), "Move to Group").show_ui(ui, |ui| {
-                ui.selectable_value(&mut target, (None, false), "");
-                for (i, grp_name) in self.group_name_buffer.iter().enumerate().take(10) {
-                    let label = if grp_name.is_empty() {
-                        format!("<insert new at {}>", i + 1)
-                    } else {
-                        format!("{} ({})", grp_name, i + 1)
-                    };
-                    ui.selectable_value(&mut target, (Some(i), true), label);
-                }
-            });
-            egui::ComboBox::new((fid, "copy"), "Copy to Group").show_ui(ui, |ui| {
-                ui.selectable_value(&mut target, (None, false), "");
-                for (i, grp_name) in self.group_name_buffer.iter().enumerate().take(10) {
-                    let label = if grp_name.is_empty() {
-                        format!("<insert new at {}>", i + 1)
-                    } else {
-                        format!("{} ({})", grp_name, i + 1)
-                    };
-                    ui.selectable_value(&mut target, (Some(i), false), label);
-                }
-            });
+        egui::ComboBox::new((fid, "move"), "Move to Group").show_ui(ui, |ui| {
+            ui.selectable_value(&mut target, (None, false), "");
+            for (i, grp_name) in self.group_name_buffer.iter().enumerate().take(10) {
+                let label = if grp_name.is_empty() {
+                    format!("<insert new at {}>", i)
+                } else {
+                    format!("{} ({})", grp_name, i)
+                };
+                ui.selectable_value(&mut target, (Some(i), true), label);
+            }
+        });
+        egui::ComboBox::new((fid, "copy"), "Copy to Group").show_ui(ui, |ui| {
+            ui.selectable_value(&mut target, (None, false), "");
+            for (i, grp_name) in self.group_name_buffer.iter().enumerate().take(10) {
+                let label = if grp_name.is_empty() {
+                    format!("<insert new at {}>", i)
+                } else {
+                    format!("{} ({})", grp_name, i)
+                };
+                ui.selectable_value(&mut target, (Some(i), false), label);
+            }
         });
         match target {
             (Some(target_gid), true) => {

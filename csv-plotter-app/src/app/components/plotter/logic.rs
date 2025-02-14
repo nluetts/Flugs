@@ -1,5 +1,5 @@
+use app_core::string_error::ErrorStringExt;
 use egui::Vec2;
-use plotlib::view::View;
 
 use crate::{app::components::File, EguiApp};
 
@@ -34,77 +34,90 @@ impl super::Plotter {
 }
 
 pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
-    use plotlib::grid::Grid;
-    use plotlib::page::Page;
-    use plotlib::repr::Plot;
-    use plotlib::style::*;
-    use plotlib::view::ContinuousView;
+    use plotters::prelude::*;
 
     log::debug!("requested to save svg at '{:?}'", path);
 
+    let root = SVGBackend::new(&path, (1024, 768)).into_drawing_area();
+    // let font = FontDesc::from(("sans-serif", 20.0));
     let [xmin, xmax, ymin, ymax] = app.plotter.current_plot_bounds;
 
-    // Instantiate and customize plot.
-    let mut view = ContinuousView::new()
-        .x_label("x-label / x-unit")
-        .y_label("y-label / y-unit")
-        .x_range(xmin, xmax)
-        .y_range(ymin, ymax)
-        .x_max_ticks(5)
-        .y_max_ticks(5);
-    view.add_grid(Grid::new(4, 4));
+    // Implement plotting as a closure, so we can short-circuit errors.
+    let plot = || -> Result<(), String> {
+        root.fill(&WHITE)
+            .err_to_string("could not prepare canvas for plotting")?;
 
-    for (_, grp) in app
-        .file_handler
-        .groups
-        .iter()
-        .enumerate()
-        .filter_map(|(id, x)| Some(id).zip(x.as_ref()))
-    {
-        if !grp.is_plotted {
-            continue;
-        }
-        for fid in grp.file_ids.iter() {
-            if let Some(cached_data) = app
-                .file_handler
-                .registry
-                .get(fid)
-                .and_then(|file| file.get_cache())
-            {
-                // Color for current file.
-                let color = {
-                    let color_id: i32 = (*fid).into();
-                    let color = super::ui::auto_color(color_id);
-                    color.to_hex()
-                };
+        // Initialize chart.
+        let mut chart = ChartBuilder::on(&root)
+            .margin(20u32)
+            // .caption(format!("y=x^{}", 2), font)
+            .x_label_area_size(30u32)
+            .y_label_area_size(30u32)
+            .build_cartesian_2d(xmin..xmax, ymin..ymax)
+            .err_to_string("could not prepare chart for plotting")?;
 
-                // Add plot of current file to view.
-                let plot = Plot::new(
-                    cached_data
-                        .into_iter()
-                        .filter_map(|[x, y]| {
-                            // Filter NaNs that may be present due to problems
-                            // during CSV parsing.
-                            if !(x.is_nan() || y.is_nan()) {
-                                Some((*x, *y))
-                            } else {
-                                None
-                            }
+        // Add labels.
+        chart
+            .configure_mesh()
+            .x_labels(3)
+            .y_labels(3)
+            .draw()
+            .err_to_string("could not prepare chart for plotting")?;
+
+        //
+        for (_, grp) in app
+            .file_handler
+            .groups
+            .iter()
+            .enumerate()
+            .filter_map(|(id, x)| Some(id).zip(x.as_ref()))
+        {
+            if !grp.is_plotted {
+                continue;
+            }
+            for fid in grp.file_ids.iter() {
+                if let Some((cached_data, file)) =
+                    app.file_handler
+                        .registry
+                        .get(fid)
+                        .and_then(|file| match file.get_cache() {
+                            Some(cache) => Some((cache, file)),
+                            None => None,
                         })
-                        .collect(),
-                )
-                .line_style(
-                    LineStyle::new()
-                        .width(1.0)
-                        .colour(color)
-                        .linejoin(LineJoin::Round),
-                );
-                view = view.add(plot);
+                {
+                    // Color for current file.
+                    let color_style = {
+                        let color_id: i32 = (*fid).into();
+                        let (r, g, b, a) = super::ui::auto_color(color_id).to_tuple();
+                        RGBAColor(r, g, b, a as f64 / 255.).stroke_width(1)
+                    };
+
+                    chart
+                        .draw_series(LineSeries::new(
+                            cached_data.into_iter().map(|[x, y]| (*x, *y)),
+                            color_style,
+                        ))
+                        .err_to_string("unable to draw data for SVG export")?
+                        .label(file.file_name())
+                        .legend(move |(x, y)| {
+                            PathElement::new(vec![(x, y), (x + 20, y)], color_style)
+                        });
+                    chart
+                        .configure_series_labels()
+                        .background_style(WHITE.mix(0.8))
+                        .border_style(BLACK)
+                        .position(SeriesLabelPosition::UpperRight)
+                        .draw()
+                        .err_to_string("unable to configure labels for SVG export")?;
+
+                    root.present().err_to_string("unable to write SVG output")?;
+                }
             }
         }
-    }
 
-    if let Err(err) = Page::single(&view).save(path) {
-        log::error!("unable to save {:?}: {:?}", path, err);
+        Ok(())
+    };
+    if let Err(err) = plot() {
+        log::error!("unable to plot to svg: {:?}", err);
     };
 }

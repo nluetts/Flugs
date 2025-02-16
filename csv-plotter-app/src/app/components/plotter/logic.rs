@@ -54,7 +54,8 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
         .with_xlim(xmin, xmax)
         .with_ylim(ymin, ymax)
         .with_xlabel("x-label")
-        .with_ylabel("ylabel");
+        .with_ylabel("ylabel")
+        .with_legend(true);
 
     for (_, grp) in app
         .file_handler
@@ -78,9 +79,13 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
                     })
             {
                 // Color for current file.
-                let color = {
+                let color: String = {
                     let color_id: i32 = (*fid).into();
-                    super::ui::auto_color(color_id).to_hex()
+                    super::ui::auto_color(color_id)
+                        .to_hex()
+                        .chars()
+                        .take(7)
+                        .collect()
                 };
 
                 let (scale, x0, y0) = (
@@ -88,6 +93,12 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
                     plot_file.properties.xoffset,
                     plot_file.properties.yoffset,
                 );
+                let label = if !plot_file.properties.alias.is_empty() {
+                    &plot_file.properties.alias
+                } else {
+                    plot_file.file_name()
+                };
+                log::debug!("plotting line with label {}", label);
                 let line = LinePlot::new(
                     &cached_data.iter().map(|[x, _]| *x + x0).collect::<Vec<_>>(),
                     &cached_data
@@ -96,7 +107,8 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
                         .collect::<Vec<_>>(),
                 )
                 .with_color(&color)
-                .with_linewidth(1.0);
+                .with_linewidth(1.0)
+                .with_name(label);
 
                 ax.add_line(line);
             }

@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Write};
 
 use crate::svg::{self, opts, Params, Tag};
 
@@ -84,16 +84,18 @@ impl Default for Figure {
 
 /// The container for plots and other elements.
 pub struct Axis {
+    draw_legend: bool,
+    elements: Vec<Box<dyn Element>>,
+    height: f64,
+    limits: [f64; 4],
+    plots: Vec<LinePlot>,
+    style: svg::Params,
+    ticks: Ticks,
     /// u coordinate for placement in Figure, normalized to [0, 1]
     u: f64,
     /// v coordinate for placement in Figure, normalized to [0, 1]
     v: f64,
     width: f64,
-    height: f64,
-    limits: [f64; 4],
-    ticks: Ticks,
-    elements: Vec<Box<dyn Element>>,
-    properties: svg::Params,
 }
 
 impl Axis {
@@ -105,8 +107,10 @@ impl Axis {
             height,
             limits: [0.0, 1.0, 0.0, 1.0],
             ticks: Default::default(),
+            draw_legend: false,
+            plots: Vec::new(),
             elements: Vec::new(),
-            properties: element_opts(&[("fill", "white"), ("stroke", "black")]),
+            style: element_opts(&[("fill", "white"), ("stroke", "black")]),
         }
     }
 
@@ -121,7 +125,7 @@ impl Axis {
     }
 
     pub fn add_line(&mut self, line: LinePlot) {
-        self.elements.push(Box::new(line));
+        self.plots.push(line);
     }
 
     pub fn add_label(&mut self, label: Text) {
@@ -140,7 +144,7 @@ impl Axis {
             u: 0.5,
             v: -0.1,
             angle: 0.0,
-            properties: element_opts(&[("text-anchor", "middle")]),
+            style: element_opts(&[("text-anchor", "middle")]),
         };
         self.add_label(xlabel);
         self
@@ -153,14 +157,20 @@ impl Axis {
     }
 
     pub fn with_ylabel(mut self, text: &str) -> Self {
+        let y_tick_label_width = self.ticks.y_tick_label_character_width();
         let ylabel = Text {
             text: text.to_owned(),
-            u: -0.15,
+            u: -0.075 - 0.005 * y_tick_label_width as f64,
             v: 0.5,
             angle: 270.0,
-            properties: element_opts(&[("text-anchor", "middle")]),
+            style: element_opts(&[("text-anchor", "middle")]),
         };
         self.add_label(ylabel);
+        self
+    }
+
+    pub fn with_legend(mut self, flag: bool) -> Self {
+        self.draw_legend = flag;
         self
     }
 
@@ -207,6 +217,15 @@ impl Axis {
 
         self.ticks.xpos = positions(xmin, xmax, mx);
         self.ticks.ypos = positions(ymin, ymax, my);
+
+        // Make room for the ytick labels by resizing and moving the axis.
+        // TODO: This will make the axis shrink with each call to this function.
+        // let shift = {
+        //     let width = self.ticks.y_tick_label_character_width();
+        //     width as f64 * 1e-3
+        // };
+        // self.u += shift;
+        // self.width -= shift;
     }
 
     fn transformations(
@@ -236,6 +255,7 @@ impl Axis {
     /// `Element` and implements this function without using the trait.
     fn to_tags(&self, fig: &Figure) -> Vec<Box<dyn svg::RenderTag>> {
         let (w, h) = (fig.width as f64, fig.height as f64);
+
         let mut children: Vec<_> = self
             .elements
             .iter()
@@ -245,13 +265,48 @@ impl Axis {
                 ts
             })
             .unwrap_or(Vec::new());
+        children.extend(
+            self.plots
+                .iter()
+                .map(|el| el.to_tags(self, fig))
+                .reduce(|mut ts, next_ts| {
+                    ts.extend(next_ts);
+                    ts
+                })
+                .unwrap_or(Vec::new()),
+        );
+        if self.draw_legend {
+            let mut legend_elements = Vec::new();
+            for (i, p) in self.plots.iter().filter(|p| !p.name.is_empty()).enumerate() {
+                let label = Text {
+                    text: p.name.to_owned(),
+                    u: 0.95,
+                    v: 0.95 - (i as f64 * 0.05),
+                    angle: 0.0,
+                    style: element_opts(&[
+                        (
+                            "fill",
+                            p.style.get("stroke").unwrap_or(&"black".to_string()),
+                        ),
+                        ("text-anchor", "end"),
+                        ("font-size", "10pt"),
+                    ]),
+                };
+                legend_elements.push(label);
+            }
+            children.extend(
+                legend_elements
+                    .iter()
+                    .flat_map(|lab| lab.to_tags(self, fig)),
+            );
+        }
         children.extend(self.ticks.to_tags(&self, fig));
         let mut ax_rect = Tag::<svg::Rect>::new(
             w * self.u,
             h * self.v,
             self.width * w,
             self.height * h,
-            Some(self.properties.clone()),
+            Some(self.style.clone()),
         );
         ax_rect.add_children(children);
         vec![Box::new(ax_rect)]
@@ -436,7 +491,7 @@ impl Axis {
 
 impl Default for Axis {
     fn default() -> Self {
-        Axis::new(0.15, 0.1, 0.75, 0.8)
+        Axis::new(0.125, 0.1, 0.875, 0.8)
     }
 }
 
@@ -461,7 +516,7 @@ pub struct Text {
     u: f64,
     v: f64,
     angle: f64,
-    properties: svg::Params,
+    style: svg::Params,
 }
 
 impl Element for Text {
@@ -469,20 +524,20 @@ impl Element for Text {
         let (x, y, _, _) = ax.transformations(fig);
 
         let (x, y) = (x(self.u), y(1.0 - self.v));
-        let mut params = Vec::new();
-        params.extend(self.properties.iter().map(|(a, b)| (&a[..], &b[..])));
+        let mut style = Vec::new();
+        style.extend(self.style.iter().map(|(k, v)| (&k[..], &v[..])));
 
         vec![Box::new(Tag::<svg::Text>::new(
             x,
             y,
             self.angle,
             &self.text,
-            svg::opts(&params),
+            svg::opts(&style),
         ))]
     }
 
     fn add_svg_property(&mut self, key: &str, value: &str) {
-        self.properties.insert(key.to_string(), value.to_string());
+        self.style.insert(key.to_string(), value.to_string());
     }
 
     fn identifier(&self) -> &str {
@@ -504,7 +559,7 @@ pub struct Ticks {
     ypos: Vec<f64>,
     color: String,
     linewidth: f64,
-    properties: svg::Params,
+    style: svg::Params,
 }
 
 impl Default for Ticks {
@@ -514,7 +569,7 @@ impl Default for Ticks {
             ypos: Vec::new(),
             color: "black".to_string(),
             linewidth: 1.0,
-            properties: Params::new(),
+            style: Params::new(),
         }
     }
 }
@@ -525,37 +580,38 @@ impl Element for Ticks {
         let [xmin, xmax, ymin, ymax] = ax.limits_ordered();
 
         let width_param = format!("{}", self.linewidth);
-        let params = [
+        let style = [
             ("stroke", &self.color[..]),
             ("stroke-width", &width_param[..]),
         ];
-        let params_xtick_label = [("text-anchor", "middle")];
-        let params_ytick_label = [("text-anchor", "end")];
+        let style_xtick_label = [("text-anchor", "middle")];
+        let style_ytick_label = [("text-anchor", "end")];
 
         let mut xticks: Vec<Box<dyn svg::RenderTag>> = Vec::new();
         let mut yticks: Vec<Box<dyn svg::RenderTag>> = Vec::new();
 
-        for xi in self.xpos.iter() {
-            let lt = Tag::<svg::Line>::new(x(u(*xi)), x(u(*xi)), y(0.99), y(1.01), opts(&params));
+        let (xtick_labels, ytick_labels) = self.format_ticks();
+
+        for (xi, li) in self.xpos.iter().zip(xtick_labels) {
+            let lt = Tag::<svg::Line>::new(x(u(*xi)), x(u(*xi)), y(0.99), y(1.01), opts(&style));
             let tt = Tag::<svg::Text>::new(
                 x(u(*xi)),
                 y(1.05),
                 0.0,
-                &format!("{xi}"),
-                opts(&params_xtick_label.clone()),
+                &li,
+                opts(&style_xtick_label.clone()),
             );
             xticks.push(Box::new(lt));
             xticks.push(Box::new(tt));
         }
-        for yi in self.ypos.iter() {
-            let lt =
-                Tag::<svg::Line>::new(x(-0.005), x(0.005), y(v(*yi)), y(v(*yi)), opts(&params));
+        for (yi, li) in self.ypos.iter().zip(ytick_labels) {
+            let lt = Tag::<svg::Line>::new(x(-0.005), x(0.005), y(v(*yi)), y(v(*yi)), opts(&style));
             let tt = Tag::<svg::Text>::new(
                 x(-0.03),
                 y(v(*yi) + 0.02),
                 0.0,
-                &format!("{yi}"),
-                opts(&params_ytick_label.clone()),
+                &li,
+                opts(&style_ytick_label.clone()),
             );
             yticks.push(Box::new(lt));
             yticks.push(Box::new(tt));
@@ -565,11 +621,51 @@ impl Element for Ticks {
     }
 
     fn add_svg_property(&mut self, key: &str, value: &str) {
-        self.properties.insert(key.to_string(), value.to_string());
+        self.style.insert(key.to_string(), value.to_string());
     }
 
     fn identifier(&self) -> &str {
         "Ticks"
+    }
+}
+
+impl Ticks {
+    fn format_ticks(&self) -> (Vec<String>, Vec<String>) {
+        // Formatter functions for the tick labels.
+        let x_fmt = |xi| {
+            if self
+                .xpos
+                .iter()
+                .filter(|x| **x != 0.0)
+                .any(|x| (*x).abs() < 1e-3 || (*x).abs() > 1e4)
+            {
+                format!("{xi:.2E}")
+            } else {
+                format!("{xi}")
+            }
+        };
+        let y_fmt = |yi| {
+            if self
+                .ypos
+                .iter()
+                .filter(|y| **y != 0.0)
+                .any(|y| (*y).abs() < 1e-3 || (*y).abs() > 1e3)
+            {
+                format!("{yi:.2E}")
+            } else {
+                format!("{yi}")
+            }
+        };
+
+        let xtick_labels = self.xpos.iter().map(|x| x_fmt(x)).collect();
+        let ytick_labels = self.ypos.iter().map(|y| y_fmt(y)).collect();
+
+        (xtick_labels, ytick_labels)
+    }
+
+    fn y_tick_label_character_width(&self) -> usize {
+        let (_, labels) = self.format_ticks();
+        labels.iter().map(|lab| lab.len()).max().unwrap_or(0)
     }
 }
 
@@ -585,7 +681,8 @@ impl Element for Ticks {
 pub struct LinePlot {
     xs: Vec<f64>,
     ys: Vec<f64>,
-    properties: svg::Params,
+    style: svg::Params,
+    name: String,
 }
 
 impl LinePlot {
@@ -593,29 +690,34 @@ impl LinePlot {
         Self {
             xs: xs.to_vec(),
             ys: ys.to_vec(),
-            properties: svg::Params::new(),
+            style: svg::Params::new(),
+            name: String::new(),
         }
     }
 
     pub fn with_color(mut self, color: &str) -> Self {
-        self.properties
-            .insert("stroke".to_string(), color.to_string());
+        self.style.insert("stroke".to_string(), color.to_string());
         self
     }
 
     pub fn with_linewidth(mut self, linewidth: f64) -> Self {
-        self.properties
+        self.style
             .insert("stroke-width".to_string(), format!("{linewidth}"));
         self
     }
 
+    pub fn with_name(mut self, name: &str) -> Self {
+        self.name.drain(..);
+        self.name.write_str(name);
+        self
+    }
+
     pub fn set_color(&mut self, color: &str) {
-        self.properties
-            .insert("stroke".to_string(), color.to_string());
+        self.style.insert("stroke".to_string(), color.to_string());
     }
 
     pub fn set_linewidth(&mut self, linewidth: f64) {
-        self.properties
+        self.style
             .insert("stroke-width".to_string(), format!("{linewidth}"));
     }
 
@@ -628,22 +730,22 @@ impl LinePlot {
 impl Element for LinePlot {
     fn to_tags(&self, ax: &Axis, fig: &Figure) -> Vec<Box<dyn svg::RenderTag>> {
         let (x, y, u, v) = ax.transformations(fig);
-        let mut plines: Vec<Box<dyn svg::RenderTag>> = Vec::new();
+        let mut svg_tags: Vec<Box<dyn svg::RenderTag>> = Vec::new();
         for (xs, ys) in ax.segment_lineplot_data(self).into_iter() {
             let xs = xs.iter().map(|xi| x(u(*xi)));
             let ys = ys.iter().map(|yi| y(v(*yi)));
-            plines.push(Box::new(Tag::<svg::Polyline>::new(
+            svg_tags.push(Box::new(Tag::<svg::Polyline>::new(
                 xs,
                 ys,
-                Some(self.properties.clone()),
+                Some(self.style.clone()),
             )));
         }
 
-        plines
+        svg_tags
     }
 
     fn add_svg_property(&mut self, key: &str, value: &str) {
-        self.properties.insert(key.to_string(), value.to_string());
+        self.style.insert(key.to_string(), value.to_string());
     }
 
     fn identifier(&self) -> &str {

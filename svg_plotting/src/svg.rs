@@ -2,7 +2,10 @@
 // This code is a thin Rust wrapper to handle SVG tags
 // and render the results to *.svg files.
 
-use std::fmt::{Display, Write};
+use std::{
+    fmt::{Display, Write},
+    io::Seek,
+};
 
 // ----------------------------------------------------------------------------
 //
@@ -26,6 +29,15 @@ where
         write!(buf, "<{}", self.kind.identifier()).expect(FAILED_STRING_WRITE);
         for (k, v) in self.parameters.iter() {
             write!(buf, " {k}=\"{v}\"").expect(FAILED_STRING_WRITE);
+        }
+        if !self.style.is_empty() {
+            write!(buf, " style=\"").expect(FAILED_STRING_WRITE);
+            for (k, v) in self.style.iter() {
+                write!(buf, "{k}:{v};").expect(FAILED_STRING_WRITE);
+            }
+            // Remove last surplus space.
+            buf.pop();
+            write!(buf, "\"").expect(FAILED_STRING_WRITE);
         }
         if !self.closing {
             write!(buf, " /").expect(FAILED_STRING_WRITE);
@@ -58,6 +70,7 @@ where
     T: std::fmt::Debug,
 {
     parameters: Params,
+    style: Params,
     children: Vec<Box<dyn RenderTag>>,
     closing: bool,
     kind: T,
@@ -84,7 +97,7 @@ where
 // ----------------------------------------------------------------------------
 
 impl Tag<SVG> {
-    pub fn new(width: u64, height: u64, params: Option<Params>) -> Self {
+    pub fn new(width: u64, height: u64, style: Option<Params>) -> Self {
         let children = Vec::new();
         let mut parameters: Params = [
             ("width", format!("{width}")),
@@ -94,11 +107,11 @@ impl Tag<SVG> {
         ]
         .into_iter()
         .map(|(k, v)| (k.to_string(), v))
-        .chain(params.unwrap_or_default())
         .collect();
 
         Self {
             parameters,
+            style: style.unwrap_or(Params::new()),
             children,
             closing: true,
             kind: SVG {},
@@ -107,7 +120,7 @@ impl Tag<SVG> {
 }
 
 impl Tag<Circle> {
-    pub fn new(cx: f64, cy: f64, r: f64, params: Option<Params>) -> Self {
+    pub fn new(cx: f64, cy: f64, r: f64, style: Option<Params>) -> Self {
         let children = Vec::new();
         let mut parameters: Params = [
             ("cx", format!("{cx}")),
@@ -116,11 +129,11 @@ impl Tag<Circle> {
         ]
         .into_iter()
         .map(|(k, v)| (k.to_string(), v))
-        .chain(params.unwrap_or_default())
         .collect();
 
         Self {
             parameters,
+            style: style.unwrap_or(Params::new()),
             children,
             closing: false,
             kind: Circle {},
@@ -129,7 +142,7 @@ impl Tag<Circle> {
 }
 
 impl Tag<Rect> {
-    pub fn new(x: f64, y: f64, width: f64, height: f64, params: Option<Params>) -> Self {
+    pub fn new(x: f64, y: f64, width: f64, height: f64, style: Option<Params>) -> Self {
         let children = Vec::new();
         let mut parameters: Params = [
             ("x", format!("{x}")),
@@ -139,11 +152,11 @@ impl Tag<Rect> {
         ]
         .into_iter()
         .map(|(k, v)| (k.to_string(), v))
-        .chain(params.unwrap_or_default())
         .collect();
 
         Self {
             parameters,
+            style: style.unwrap_or(Params::new()),
             children,
             closing: false,
             kind: Rect {},
@@ -152,16 +165,16 @@ impl Tag<Rect> {
 }
 
 impl Tag<Text> {
-    pub fn new(x: f64, y: f64, angle: f64, text: &str, params: Option<Params>) -> Self {
+    pub fn new(x: f64, y: f64, angle: f64, text: &str, style: Option<Params>) -> Self {
         let children = Vec::new();
         let mut parameters: Params = [("transform", format!("translate({x},{y}) rotate({angle})"))]
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))
-            .chain(params.unwrap_or_default())
             .collect();
 
         let mut res = Self {
             parameters,
+            style: style.unwrap_or(Params::new()),
             children,
             closing: true,
             kind: Text {},
@@ -173,7 +186,7 @@ impl Tag<Text> {
 }
 
 impl Tag<Line> {
-    pub fn new(x1: f64, x2: f64, y1: f64, y2: f64, params: Option<Params>) -> Self {
+    pub fn new(x1: f64, x2: f64, y1: f64, y2: f64, style: Option<Params>) -> Self {
         let children = Vec::new();
         let mut parameters: Params = [
             ("x1", format!("{x1}")),
@@ -184,11 +197,11 @@ impl Tag<Line> {
         ]
         .into_iter()
         .map(|(k, v)| (k.to_string(), v))
-        .chain(params.unwrap_or_default())
         .collect();
 
         Self {
             parameters,
+            style: style.unwrap_or(Params::new()),
             children,
             closing: false,
             kind: Line {},
@@ -199,7 +212,7 @@ impl Tag<Polyline> {
     pub fn new(
         xs: impl IntoIterator<Item = f64>,
         ys: impl IntoIterator<Item = f64>,
-        params: Option<Params>,
+        style: Option<Params>,
     ) -> Self {
         let children = Vec::new();
         let mut raw_points = String::new();
@@ -209,11 +222,11 @@ impl Tag<Polyline> {
         let mut parameters: Params = [("points", raw_points), ("fill", "none".to_string())]
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))
-            .chain(params.unwrap_or_default())
             .collect();
 
         Self {
             parameters,
+            style: style.unwrap_or(Params::new()),
             children,
             closing: false,
             kind: Polyline {},

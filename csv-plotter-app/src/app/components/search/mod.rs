@@ -18,6 +18,8 @@ pub struct Search {
     search_path: UIParameter<PathBuf>,
     search_query: String,
     popup_shown: bool,
+    selected_match: Option<usize>,
+    search_phrase_input_active: bool,
     awaiting_search_path_selection: Option<JoinHandle<Option<PathBuf>>>,
     request_tx: DynRequestSender,
 }
@@ -27,7 +29,14 @@ pub struct Match {
     pub(super) path: PathBuf,
     pub(super) matched_indices: HashSet<usize>,
     pub(super) assigned_group: Option<usize>,
-    pub(super) parsed_data: Option<CSVData>,
+    pub(super) parsed_data: ParsedData,
+}
+
+#[derive(Debug, Clone)]
+pub enum ParsedData {
+    Ok(CSVData),
+    Failed(String),
+    None,
 }
 
 impl Search {
@@ -37,6 +46,8 @@ impl Search {
             popup_shown: Default::default(),
             search_path: Default::default(),
             search_query: Default::default(),
+            selected_match: None,
+            search_phrase_input_active: true,
             awaiting_search_path_selection: Default::default(),
             request_tx,
         }

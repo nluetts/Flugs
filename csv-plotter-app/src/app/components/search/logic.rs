@@ -48,7 +48,9 @@ impl super::Search {
                 let search_results = b.state.search_filter(&query);
                 search_results
                     .into_iter()
-                    .map(|(path, indices)| super::Match::new(path, indices, None, None))
+                    .map(|(path, indices)| {
+                        super::Match::new(path, indices, None, super::ParsedData::None)
+                    })
                     .collect()
             },
             request_tx,

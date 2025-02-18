@@ -34,6 +34,32 @@ impl super::Search {
             screen_height * 0.2,
         )));
 
+        // Handle arrow keys for selecting entries.
+        ctx.input(|i| {
+            if i.key_released(egui::Key::ArrowDown) {
+                self.selected_match = match self.selected_match {
+                    Some(n) if n < 9 => Some(n + 1),
+                    Some(9) => Some(9),
+                    None => {
+                        self.search_phrase_input_active = false;
+                        Some(0)
+                    }
+                    _ => unreachable!(),
+                }
+            };
+            if i.key_released(egui::Key::ArrowUp) {
+                self.selected_match = match self.selected_match {
+                    Some(0) => {
+                        self.search_phrase_input_active = true;
+                        None
+                    }
+                    Some(n) if n <= 9 => Some(n - 1),
+                    None => None,
+                    _ => unreachable!(),
+                }
+            };
+        });
+
         let modal = egui::Modal::new("search_popup".into()).area(draw_area);
 
         let modal_ui = |ui: &mut egui::Ui| {
@@ -71,7 +97,13 @@ impl super::Search {
             let phrase_input = ui.add(
                 egui::TextEdit::singleline(&mut self.search_query).desired_width(search_text_width),
             );
+            if self.search_phrase_input_active {
+                phrase_input.request_focus();
+            } else {
+                phrase_input.surrender_focus();
+            }
             if popup_opened_this_frame || phrase_input.hovered() {
+                self.search_phrase_input_active = true;
                 phrase_input.request_focus()
             };
             if phrase_input.changed() {
@@ -87,6 +119,16 @@ impl super::Search {
         };
 
         let modal_response = modal.show(ctx, modal_ui);
+        // // What to do if modal loses focus.
+        // if !ctx.input(|i| {
+        //     i.pointer
+        //         .latest_pos()
+        //         .map(|pos| modal_response.response.rect.contains(pos))
+        //         .unwrap_or(false)
+        // }) {
+        //     self.search_phrase_input_active = false;
+        //     self.selected_match = None;
+        // }
 
         if modal_response.should_close() || ctx.input(|i| i.key_released(egui::Key::Escape)) {
             self.popup_shown = false;
@@ -112,12 +154,15 @@ impl super::Search {
         let height = 600.0;
 
         let scroll_area = |ui: &mut egui::Ui| {
-            for super::Match {
-                path: fp,
-                matched_indices: indices,
-                assigned_group: group_id,
-                parsed_data: csv_data,
-            } in self.matches.value_mut()
+            for (
+                i,
+                super::Match {
+                    path: fp,
+                    matched_indices: indices,
+                    assigned_group: group_id,
+                    parsed_data: csv_data,
+                },
+            ) in self.matches.value_mut().iter_mut().enumerate()
             {
                 if indices.is_empty() {
                     break;
@@ -127,54 +172,108 @@ impl super::Search {
                 // This cursor will be used when hovering a label.
                 let mut cursor = egui::CursorIcon::Default;
 
-                ui.add(path_label)
-                    .on_hover_ui_at_pointer(|ui| {
-                        ui.label("press '0' to '9' to add to group, <enter> to accept");
-                        // If we hover a file path, we loose focus on search phrase
-                        // input so we do not put in the following keyboard events
-                        // as search phrase; however, if we just opened the search
-                        // popup and do not move the mouse we keep the focus.
-                        if ctx.input(|i| i.pointer.is_moving()) {
-                            phrase_input.surrender_focus()
-                        // If we do not move the mouse and did not try yet, we
-                        // try parsing the current file.
-                        } else if let None = csv_data {
-                            if let Ok(data) = CSVData::from_path(&self.search_path.value().join(fp))
-                            {
-                                *csv_data = Some(data);
-                            };
-                        } else if let Some(csv_data) = csv_data {
-                            ui.separator();
-                            ui.label("preview:");
-                            egui_plot::Plot::new("Plot")
-                                .view_aspect(4.0 / 3.0)
-                                .show_axes(false)
-                                .show(ui, |plot_ui| {
-                                    plot_ui.line(egui_plot::Line::new(
-                                        csv_data.get_cache().data.to_owned(),
-                                    ));
-                                });
-                            cursor = egui::CursorIcon::PointingHand;
-                        };
+                let mut mini_plot_ui_hovered = false;
 
-                        let (input_active, numkey_released) =
-                            (phrase_input.has_focus(), ctx.input(number_key_released));
-                        match (input_active, numkey_released) {
-                            (_, None) => (),
-                            (true, Some(_)) => (),
-                            (false, Some(released_num)) => {
-                                // TODO: I bet there is an easier way:
-                                if let Some(gid) = group_id.take() {
-                                    if released_num != gid {
-                                        group_id.replace(released_num);
+                // Fancy hover ui for each match.
+                let resp = ui
+                    .add(path_label)
+                    .on_hover_ui_at_pointer(|ui| {
+                        mini_plot_ui_hovered = true;
+
+                        ui.set_min_width(300.0);
+                        match csv_data {
+                            super::ParsedData::Failed(_msg) => {
+                                let txt = egui::RichText::new("could not parse this file")
+                                    .color(egui::Color32::RED);
+                                ui.label(txt);
+                                cursor = egui::CursorIcon::NotAllowed;
+                            }
+                            super::ParsedData::None => {
+                                match CSVData::from_path(&self.search_path.value().join(&fp)) {
+                                    Ok(data) => *csv_data = super::ParsedData::Ok(data),
+                                    Err(err) => {
+                                        *csv_data = super::ParsedData::Failed(err.to_string())
                                     }
-                                } else {
-                                    group_id.replace(released_num);
                                 }
+                            }
+                            super::ParsedData::Ok(csv_data) => {
+                                ui.label("press '0' to '9' to add to group, <enter> to accept");
+                                ui.separator();
+                                ui.label("preview:");
+                                egui_plot::Plot::new("Plot")
+                                    .view_aspect(4.0 / 3.0)
+                                    .show_axes(false)
+                                    .show(ui, |plot_ui| {
+                                        plot_ui.line(egui_plot::Line::new(
+                                            csv_data.get_cache().data.to_owned(),
+                                        ));
+                                    });
+                                cursor = egui::CursorIcon::PointingHand;
                             }
                         }
                     })
                     .on_hover_cursor(cursor);
+                if resp.hovered() && ctx.input(|i| i.pointer.is_moving()) {
+                    self.search_phrase_input_active = false;
+                    self.selected_match = Some(i);
+                }
+                if Some(i) == self.selected_match {
+                    let resp = resp.highlight();
+                    if !mini_plot_ui_hovered {
+                        resp.show_tooltip_ui(|ui| {
+                            // TODO: Is there a better way without copying this
+                            // code from the `on_hover_ui` above?
+                            ui.set_min_width(300.0);
+                            match csv_data {
+                                super::ParsedData::Failed(_msg) => {
+                                    let txt = egui::RichText::new("could not parse this file")
+                                        .color(egui::Color32::RED);
+                                    ui.label(txt);
+                                    cursor = egui::CursorIcon::NotAllowed;
+                                }
+                                super::ParsedData::None => {
+                                    match CSVData::from_path(&self.search_path.value().join(fp)) {
+                                        Ok(data) => *csv_data = super::ParsedData::Ok(data),
+                                        Err(err) => {
+                                            *csv_data = super::ParsedData::Failed(err.to_string())
+                                        }
+                                    }
+                                }
+                                super::ParsedData::Ok(csv_data) => {
+                                    ui.label("press '0' to '9' to add to group, <enter> to accept");
+                                    ui.separator();
+                                    ui.label("preview:");
+                                    egui_plot::Plot::new("Plot")
+                                        .view_aspect(4.0 / 3.0)
+                                        .show_axes(false)
+                                        .show(ui, |plot_ui| {
+                                            plot_ui.line(egui_plot::Line::new(
+                                                csv_data.get_cache().data.to_owned(),
+                                            ));
+                                        });
+                                    cursor = egui::CursorIcon::PointingHand;
+                                }
+                            }
+                        });
+                    }
+
+                    let (input_active, numkey_released) =
+                        (phrase_input.has_focus(), ctx.input(number_key_released));
+                    match (input_active, numkey_released) {
+                        (_, None) => (),
+                        (true, Some(_)) => (),
+                        (false, Some(released_num)) => {
+                            // TODO: I bet there is an easier way:
+                            if let Some(gid) = group_id.take() {
+                                if released_num != gid {
+                                    group_id.replace(released_num);
+                                }
+                            } else {
+                                group_id.replace(released_num);
+                            }
+                        }
+                    }
+                }
             }
         };
         egui::ScrollArea::vertical()

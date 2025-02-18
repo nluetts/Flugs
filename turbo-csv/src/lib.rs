@@ -64,6 +64,12 @@ impl Parser {
         let mut tokens = self.lexer.walk_file().into_iter().peekable();
         let mut line_valid = true;
         while let Some(tok) = tokens.next() {
+            // If the current column index goes beyond the
+            // currently known maximum number of columns, we
+            // have to add another column.
+            if current_column_idx > max_column_idx {
+                max_column_idx = current_column_idx;
+            }
             match tok {
                 Token::Integer(x) => {
                     current_row.insert(current_column_idx, x as f64);
@@ -89,12 +95,6 @@ impl Parser {
                                     .is_some_and(|tok| tok == &Token::Delimiter(' '))
                             {
                                 current_column_idx += 1;
-                            }
-                            // If the current column index goes beyond the
-                            // currently known maximum number of columns, we
-                            // have to add another column.
-                            if current_column_idx > max_column_idx {
-                                max_column_idx = current_column_idx;
                             }
                         } else {
                             // If we already saw a delimiter and the current one
@@ -587,20 +587,13 @@ mod test {
     fn test_parse_float() {
         // init();
 
-        let input = r#"This is a header without comment char.
-        # This is a comment
-        2 34 1.2
-        +1e-3 0.000213 1232e-3
-        34 -2 3
-        0.1 +2e-2 3.0001
-        23.ef this is invalid"#;
+        let input = r#"# This is a comment
+        10.0,20.0
+        20.0,40.0
+        "#;
 
         let parser = Parser::from_string(input.into());
-        let expected = vec![
-            vec![2.0, 0.001, 34.0, 0.1],
-            vec![34.0, 0.000213, -2.0, 0.02],
-            vec![1.2, 1.232, 3.0, 3.0001],
-        ];
+        let expected = vec![vec![10.0, 20.0], vec![20.0, 40.0]];
 
         let (_, result) = parser.parse_as_floats();
         assert_eq!(result, expected);

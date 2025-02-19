@@ -15,6 +15,7 @@ use crate::{app::DynRequestSender, backend_state::CSVData};
 
 pub struct Search {
     matches: UIParameter<Vec<Match>>,
+    pub matches_to_return: HashSet<Match>,
     search_path: UIParameter<PathBuf>,
     search_query: String,
     popup_shown: bool,
@@ -43,6 +44,7 @@ impl Search {
     pub fn new(request_tx: DynRequestSender) -> Self {
         Self {
             matches: Default::default(),
+            matches_to_return: Default::default(),
             popup_shown: Default::default(),
             search_path: Default::default(),
             search_query: Default::default(),

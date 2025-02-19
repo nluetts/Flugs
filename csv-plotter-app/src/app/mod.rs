@@ -150,14 +150,14 @@ impl eframe::App for EguiApp {
 
 impl EguiApp {
     fn central_panel(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        let search_results = self.search.render(&mut self.request_tx, ui, ctx);
-        let num_results = search_results.len();
-        if !search_results.is_empty() {
-            self.file_handler.add_search_results(
-                search_results,
-                self.search.get_search_path(),
-                &mut self.request_tx,
-            );
+        // This call fills `self.search.matches_to_return` with
+        // the selected entries. This hashset is cleared by the
+        // `file_handler.add_search_results` call.
+        self.search.render(&mut self.request_tx, ui, ctx);
+        let num_results = self.search.matches_to_return.len();
+        if num_results > 0 {
+            self.file_handler
+                .add_search_results(&mut self.search, &mut self.request_tx);
             log::debug!("file handler updated with {} new entries", num_results);
         }
 

@@ -10,18 +10,20 @@ impl super::Search {
         request_tx: &mut DynRequestSender,
         _ui: &mut egui::Ui,
         ctx: &egui::Context,
-    ) -> HashSet<super::Match> {
+    ) {
         let mut popup_opened_this_frame = false;
         // sense if search shortcut was pressed
         if ctx.input(|i| i.modifiers.command && i.key_released(egui::Key::Space)) {
             self.popup_shown = !self.popup_shown;
             if self.popup_shown {
+                // Clear matches to return;
+                self.matches_to_return.drain();
                 popup_opened_this_frame = true;
             }
         }
 
         if !self.popup_shown {
-            return HashSet::new();
+            return;
         }
 
         let screen_width = ctx.screen_rect().width();
@@ -119,16 +121,6 @@ impl super::Search {
         };
 
         let modal_response = modal.show(ctx, modal_ui);
-        // // What to do if modal loses focus.
-        // if !ctx.input(|i| {
-        //     i.pointer
-        //         .latest_pos()
-        //         .map(|pos| modal_response.response.rect.contains(pos))
-        //         .unwrap_or(false)
-        // }) {
-        //     self.search_phrase_input_active = false;
-        //     self.selected_match = None;
-        // }
 
         if modal_response.should_close() || ctx.input(|i| i.key_released(egui::Key::Escape)) {
             self.popup_shown = false;
@@ -136,17 +128,18 @@ impl super::Search {
 
         if ctx.input(|i| i.key_released(egui::Key::Enter)) {
             self.popup_shown = false;
-            let to_load: HashSet<super::Match> = self
+            let number_added = 0;
+            for mtch in self
                 .matches
                 .value_mut()
                 .drain(..)
                 .filter(|mtch| mtch.assigned_group.is_some())
-                .collect();
+            {
+                self.matches_to_return.insert(mtch);
+            }
             self.search_query.clear();
-            log::debug!("returning {} paths to load", to_load.len());
-            return to_load;
+            log::debug!("added {} paths to load", number_added);
         };
-        HashSet::new()
     }
 
     fn matches_ui(&mut self, ui: &mut egui::Ui, phrase_input: egui::Response, ctx: &egui::Context) {

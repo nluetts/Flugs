@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::Path};
+use std::path::Path;
 
 use app_core::{
     backend::{BackendEventLoop, BackendLink, LinkReceiver},
@@ -7,7 +7,13 @@ use app_core::{
 };
 
 use crate::{
-    app::{components::search::Match, DynRequestSender},
+    app::{
+        components::{
+            search::{Match, ParsedData},
+            Search,
+        },
+        DynRequestSender,
+    },
     backend_state::CSVData,
     BackendAppState,
 };
@@ -25,19 +31,15 @@ impl File {
 }
 
 impl FileHandler {
-    pub fn add_search_results(
-        &mut self,
-        search_results: HashSet<Match>,
-        search_path: &Path,
-        request_tx: &mut DynRequestSender,
-    ) {
+    pub fn add_search_results(&mut self, search: &mut Search, request_tx: &mut DynRequestSender) {
+        let search_path = search.get_search_path().to_owned();
         for Match {
             path: fp,
             matched_indices: _,
             assigned_group: gid,
             // TODO: use pre-cached CSV data from search matches
-            parsed_data: _,
-        } in search_results.into_iter()
+            parsed_data,
+        } in search.matches_to_return.drain()
         {
             let gid =
                 gid.expect("file handler was handed a search result not assigned to any group");
@@ -54,8 +56,17 @@ impl FileHandler {
                 *fid
             } else {
                 let fid = self.next_id();
-                let mut csv_data = UIParameter::new(Err("Data no loaded".to_string()));
-                csv_data.set_recv(parse_csv(&search_path.join(&fp), request_tx));
+                let csv_data = match parsed_data {
+                    ParsedData::Ok(data) => UIParameter::new(Ok(data)),
+                    ParsedData::Failed(_) => {
+                        UIParameter::new(Err("Failed to parse file.".to_string()))
+                    }
+                    ParsedData::None => {
+                        let mut param = UIParameter::new(Err("Data no loaded".to_string()));
+                        param.set_recv(parse_csv(&search_path.join(&fp), request_tx));
+                        param
+                    }
+                };
 
                 self.registry.insert(
                     fid,

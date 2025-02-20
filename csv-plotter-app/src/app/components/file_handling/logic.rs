@@ -39,7 +39,11 @@ impl FileHandler {
             assigned_group: gid,
             // TODO: use pre-cached CSV data from search matches
             parsed_data,
-        } in search.matches_to_return.drain()
+        } in search
+            .matches
+            .value_mut()
+            .drain(..)
+            .filter(|mtch| mtch.assigned_group.is_some())
         {
             let gid =
                 gid.expect("file handler was handed a search result not assigned to any group");

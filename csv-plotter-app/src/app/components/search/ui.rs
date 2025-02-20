@@ -1,8 +1,14 @@
-use std::{collections::HashSet, path::Path};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
+use app_core::frontend::UIParameter;
 use egui::{text::LayoutJob, Color32, FontId, InputState, Label, Pos2, TextFormat};
 
 use crate::{app::DynRequestSender, backend_state::CSVData};
+
+use super::SearchMode;
 
 impl super::Search {
     pub fn render(
@@ -10,20 +16,17 @@ impl super::Search {
         request_tx: &mut DynRequestSender,
         _ui: &mut egui::Ui,
         ctx: &egui::Context,
-    ) {
-        let mut popup_opened_this_frame = false;
-        // sense if search shortcut was pressed
+    ) -> bool {
+        // Sense if search shortcut was pressed.
         if ctx.input(|i| i.modifiers.command && i.key_released(egui::Key::Space)) {
-            self.popup_shown = !self.popup_shown;
-            if self.popup_shown {
-                // Clear matches to return;
-                self.matches_to_return.drain();
-                popup_opened_this_frame = true;
-            }
+            self.mode = match self.mode {
+                SearchMode::Disabled => SearchMode::KeyboardInput,
+                _ => SearchMode::Disabled,
+            };
         }
 
-        if !self.popup_shown {
-            return;
+        if self.mode == SearchMode::Disabled {
+            return false;
         }
 
         let screen_width = ctx.screen_rect().width();
@@ -39,20 +42,19 @@ impl super::Search {
         // Handle arrow keys for selecting entries.
         ctx.input(|i| {
             if i.key_released(egui::Key::ArrowDown) {
+                self.mode = SearchMode::KeyboardSelection;
                 self.selected_match = match self.selected_match {
                     Some(n) if n < 9 => Some(n + 1),
                     Some(9) => Some(9),
-                    None => {
-                        self.search_phrase_input_active = false;
-                        Some(0)
-                    }
+                    None => Some(0),
                     _ => unreachable!(),
                 }
             };
             if i.key_released(egui::Key::ArrowUp) {
+                self.mode = SearchMode::KeyboardSelection;
                 self.selected_match = match self.selected_match {
                     Some(0) => {
-                        self.search_phrase_input_active = true;
+                        self.mode = SearchMode::KeyboardInput;
                         None
                     }
                     Some(n) if n <= 9 => Some(n - 1),
@@ -62,13 +64,13 @@ impl super::Search {
             };
         });
 
+        // Holds all of the search UI.
         let modal = egui::Modal::new("search_popup".into()).area(draw_area);
 
+        // Declaration of search UI.
         let modal_ui = |ui: &mut egui::Ui| {
-            let read_current_ui_enabled = self.search_path.is_up_to_date();
-
-            // UI for search path loading and updating
-            ui.add_enabled_ui(read_current_ui_enabled, |ui| {
+            // UI for search path loading and updating.
+            ui.add_enabled_ui(self.search_path.is_up_to_date(), |ui| {
                 ui.label("current search root path:");
                 ui.horizontal(|ui| {
                     ui.label(self.search_path.value_mut().to_string_lossy());
@@ -99,47 +101,43 @@ impl super::Search {
             let phrase_input = ui.add(
                 egui::TextEdit::singleline(&mut self.search_query).desired_width(search_text_width),
             );
-            if self.search_phrase_input_active {
-                phrase_input.request_focus();
-            } else {
-                phrase_input.surrender_focus();
+
+            match self.mode {
+                SearchMode::KeyboardInput => phrase_input.request_focus(),
+                _ => phrase_input.surrender_focus(),
             }
-            if popup_opened_this_frame || phrase_input.hovered() {
-                self.search_phrase_input_active = true;
-                phrase_input.request_focus()
-            };
+
             if phrase_input.changed() {
                 self.query_current_path(request_tx);
             };
 
-            let paths_ui_enabled = self.matches.is_up_to_date();
-
             // Render the matched file list.
-            ui.add_enabled_ui(paths_ui_enabled, |ui| {
+            ui.add_enabled_ui(self.matches.is_up_to_date(), |ui| {
                 self.matches_ui(ui, phrase_input, ctx);
             });
         };
 
+        // Show the search UI.
         let modal_response = modal.show(ctx, modal_ui);
 
         if modal_response.should_close() || ctx.input(|i| i.key_released(egui::Key::Escape)) {
-            self.popup_shown = false;
+            self.mode = SearchMode::Disabled;
         };
 
         if ctx.input(|i| i.key_released(egui::Key::Enter)) {
-            self.popup_shown = false;
-            let number_added = 0;
-            for mtch in self
+            self.mode = SearchMode::Disabled;
+            // Count number of matches which were assigned to a group.
+            let number_added: usize = self
                 .matches
                 .value_mut()
-                .drain(..)
-                .filter(|mtch| mtch.assigned_group.is_some())
-            {
-                self.matches_to_return.insert(mtch);
-            }
-            self.search_query.clear();
+                .iter()
+                .enumerate()
+                .filter_map(|(i, mtch)| mtch.assigned_group.map(|_m| i))
+                .sum();
             log::debug!("added {} paths to load", number_added);
+            return true;
         };
+        return false;
     }
 
     fn matches_ui(&mut self, ui: &mut egui::Ui, phrase_input: egui::Response, ctx: &egui::Context) {
@@ -148,7 +146,7 @@ impl super::Search {
 
         let scroll_area = |ui: &mut egui::Ui| {
             for (
-                i,
+                match_no,
                 super::Match {
                     path: fp,
                     matched_indices: indices,
@@ -165,91 +163,35 @@ impl super::Search {
                 // This cursor will be used when hovering a label.
                 let mut cursor = egui::CursorIcon::Default;
 
-                let mut mini_plot_ui_hovered = false;
-
                 // Fancy hover ui for each match.
-                let resp = ui
-                    .add(path_label)
-                    .on_hover_ui_at_pointer(|ui| {
-                        mini_plot_ui_hovered = true;
+                let hover_ui = |ui: &mut egui::Ui| {
+                    match_hover_ui(ui, csv_data, &mut cursor, fp, &self.search_path);
+                };
 
-                        ui.set_min_width(300.0);
-                        match csv_data {
-                            super::ParsedData::Failed(_msg) => {
-                                let txt = egui::RichText::new("could not parse this file")
-                                    .color(egui::Color32::RED);
-                                ui.label(txt);
-                                cursor = egui::CursorIcon::NotAllowed;
-                            }
-                            super::ParsedData::None => {
-                                match CSVData::from_path(&self.search_path.value().join(&fp)) {
-                                    Ok(data) => *csv_data = super::ParsedData::Ok(data),
-                                    Err(err) => {
-                                        *csv_data = super::ParsedData::Failed(err.to_string())
-                                    }
-                                }
-                            }
-                            super::ParsedData::Ok(csv_data) => {
-                                ui.label("press '0' to '9' to add to group, <enter> to accept");
-                                ui.separator();
-                                ui.label("preview:");
-                                egui_plot::Plot::new("Plot")
-                                    .view_aspect(4.0 / 3.0)
-                                    .show_axes(false)
-                                    .show(ui, |plot_ui| {
-                                        plot_ui.line(egui_plot::Line::new(
-                                            csv_data.get_cache().data.to_owned(),
-                                        ));
-                                    });
-                                cursor = egui::CursorIcon::PointingHand;
-                            }
-                        }
-                    })
-                    .on_hover_cursor(cursor);
+                // Render the matched entry.
+                let resp = ui.add(path_label);
+
                 if resp.hovered() && ctx.input(|i| i.pointer.is_moving()) {
-                    self.search_phrase_input_active = false;
-                    self.selected_match = Some(i);
+                    self.mode = SearchMode::MouseSelection;
+                    self.selected_match = Some(match_no);
                 }
-                if Some(i) == self.selected_match {
-                    let resp = resp.highlight();
-                    if !mini_plot_ui_hovered {
-                        resp.show_tooltip_ui(|ui| {
-                            // TODO: Is there a better way without copying this
-                            // code from the `on_hover_ui` above?
-                            ui.set_min_width(300.0);
-                            match csv_data {
-                                super::ParsedData::Failed(_msg) => {
-                                    let txt = egui::RichText::new("could not parse this file")
-                                        .color(egui::Color32::RED);
-                                    ui.label(txt);
-                                    cursor = egui::CursorIcon::NotAllowed;
-                                }
-                                super::ParsedData::None => {
-                                    match CSVData::from_path(&self.search_path.value().join(fp)) {
-                                        Ok(data) => *csv_data = super::ParsedData::Ok(data),
-                                        Err(err) => {
-                                            *csv_data = super::ParsedData::Failed(err.to_string())
-                                        }
-                                    }
-                                }
-                                super::ParsedData::Ok(csv_data) => {
-                                    ui.label("press '0' to '9' to add to group, <enter> to accept");
-                                    ui.separator();
-                                    ui.label("preview:");
-                                    egui_plot::Plot::new("Plot")
-                                        .view_aspect(4.0 / 3.0)
-                                        .show_axes(false)
-                                        .show(ui, |plot_ui| {
-                                            plot_ui.line(egui_plot::Line::new(
-                                                csv_data.get_cache().data.to_owned(),
-                                            ));
-                                        });
-                                    cursor = egui::CursorIcon::PointingHand;
-                                }
-                            }
-                        });
-                    }
 
+                // Draw hover ui depending on mode (keyboard or mouse selection).
+                if Some(match_no) == self.selected_match {
+                    let resp = resp.highlight();
+                    let resp = match self.mode {
+                        SearchMode::KeyboardSelection => {
+                            resp.show_tooltip_ui(hover_ui);
+                            resp
+                        }
+                        SearchMode::MouseSelection => resp.on_hover_ui_at_pointer(hover_ui),
+                        _ => resp,
+                    };
+
+                    // Adapt cursor to whether or not match entry was parsed.
+                    resp.on_hover_cursor(cursor);
+
+                    // Assign group based on number button presses.
                     let (input_active, numkey_released) =
                         (phrase_input.has_focus(), ctx.input(number_key_released));
                     match (input_active, numkey_released) {
@@ -269,11 +211,46 @@ impl super::Search {
                 }
             }
         };
+
         egui::ScrollArea::vertical()
             .min_scrolled_height(height)
             .max_width(width)
             .max_height(height)
             .show(ui, scroll_area);
+    }
+}
+
+fn match_hover_ui(
+    ui: &mut egui::Ui,
+    csv_data: &mut super::ParsedData,
+    cursor: &mut egui::CursorIcon,
+    fp: &mut std::path::PathBuf,
+    search_path: &UIParameter<PathBuf>,
+) {
+    ui.set_min_width(300.0);
+    match csv_data {
+        super::ParsedData::Failed(_msg) => {
+            let txt = egui::RichText::new("could not parse this file").color(egui::Color32::RED);
+            ui.label(txt);
+            *cursor = egui::CursorIcon::NotAllowed;
+        }
+        super::ParsedData::None => match CSVData::from_path(&search_path.value().join(&fp)) {
+            Ok(data) => *csv_data = super::ParsedData::Ok(data),
+            Err(err) => *csv_data = super::ParsedData::Failed(err.to_string()),
+        },
+        // If data was parsed, we show a mini plot.
+        super::ParsedData::Ok(csv_data) => {
+            ui.label("press '0' to '9' to add to group, <enter> to accept");
+            ui.separator();
+            ui.label("preview:");
+            egui_plot::Plot::new("Plot")
+                .view_aspect(4.0 / 3.0)
+                .show_axes(false)
+                .show(ui, |plot_ui| {
+                    plot_ui.line(egui_plot::Line::new(csv_data.get_cache().data.to_owned()));
+                });
+            *cursor = egui::CursorIcon::PointingHand;
+        }
     }
 }
 

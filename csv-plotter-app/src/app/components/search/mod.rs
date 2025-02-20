@@ -14,15 +14,21 @@ use derive_new::new;
 use crate::{app::DynRequestSender, backend_state::CSVData};
 
 pub struct Search {
-    matches: UIParameter<Vec<Match>>,
-    pub matches_to_return: HashSet<Match>,
+    pub matches: UIParameter<Vec<Match>>,
     search_path: UIParameter<PathBuf>,
     search_query: String,
-    popup_shown: bool,
+    mode: SearchMode,
     selected_match: Option<usize>,
-    search_phrase_input_active: bool,
     awaiting_search_path_selection: Option<JoinHandle<Option<PathBuf>>>,
     request_tx: DynRequestSender,
+}
+
+#[derive(PartialEq, Eq)]
+enum SearchMode {
+    Disabled,
+    KeyboardInput,
+    KeyboardSelection,
+    MouseSelection,
 }
 
 #[derive(Debug, Clone, new)]
@@ -44,12 +50,10 @@ impl Search {
     pub fn new(request_tx: DynRequestSender) -> Self {
         Self {
             matches: Default::default(),
-            matches_to_return: Default::default(),
-            popup_shown: Default::default(),
             search_path: Default::default(),
             search_query: Default::default(),
+            mode: SearchMode::Disabled,
             selected_match: None,
-            search_phrase_input_active: true,
             awaiting_search_path_selection: Default::default(),
             request_tx,
         }

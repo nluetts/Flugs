@@ -151,6 +151,9 @@ impl FileHandler {
         ui.horizontal(|ui| {
             let lab = ui.label("rename:");
             ui.text_edit_singleline(&mut grp.name).labelled_by(lab.id);
+        });
+        ui.horizontal(|ui| {
+            ui.label("delete group:");
             if ui.small_button("🗑").clicked() {
                 event_queue.queue_event(Box::new(RemoveGroup::new(gid)));
             }

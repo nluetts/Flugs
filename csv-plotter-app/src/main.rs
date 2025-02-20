@@ -1,10 +1,7 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
-use std::path::PathBuf;
-use std::str::FromStr;
-
 use app_core::backend::BackendEventLoop;
-use csv_plotter::{BackendAppState, EguiApp};
+use csv_plotter::{storage::load_config, BackendAppState, EguiApp};
 
 const WINDOW_NAME: &str = "PlotMe CSV Plotter";
 const WINDOW_WIDTH: f32 = 400.0;
@@ -15,9 +12,10 @@ fn main() -> eframe::Result {
 
     // start backend loop
     let (command_tx, command_rx) = std::sync::mpsc::channel();
-    let backend_state = BackendAppState::new(
-        PathBuf::from_str(csv_plotter::ROOT_PATH).expect("unable to open demo file path"),
-    );
+    #[allow(deprecated)]
+    let search_path =
+        load_config().unwrap_or(std::env::home_dir().expect("Could not set root search path!"));
+    let backend_state = BackendAppState::new(search_path);
     let eventloop_handle = BackendEventLoop::new(command_rx, backend_state).run();
 
     let native_options = eframe::NativeOptions {

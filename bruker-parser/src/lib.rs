@@ -1,10 +1,14 @@
 #![allow(unused)]
 use app_core::string_error::ErrorStringExt;
 use std::{
+    collections::HashMap,
+    fmt::Write as fmtWrite,
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
     os::unix::fs::FileExt,
-    path::Path,
+    path::{Path, PathBuf},
+    str::FromStr,
+    time::SystemTime,
 };
 
 const HEADER_SIZE_BYTES: usize = 504;
@@ -120,27 +124,118 @@ impl BlockDefinition {
         let kind: BlockKind = (data_type, channel_type).into();
 
         // Read chunk size and offset of data block holding data.
-        let size = bytes_to_u32(&buf[cursor + 4..cursor + 8]) as usize;
-        let offset = bytes_to_u32(&buf[cursor + 8..cursor + 12]) as usize;
+        let size = u32::from_le_bytes([
+            buf[cursor + 4],
+            buf[cursor + 5],
+            buf[cursor + 6],
+            buf[cursor + 7],
+        ]) as usize;
+        let offset = u32::from_le_bytes([
+            buf[cursor + 8],
+            buf[cursor + 9],
+            buf[cursor + 10],
+            buf[cursor + 11],
+        ]) as usize;
 
         Self { kind, offset, size }
     }
 
-    fn read_from_file(&self, file: &mut File) -> Result<Vec<f32>, String> {
+    /// Read a data block from the file, defined by self. This is currently
+    /// only tested on AB blocks and may fail on other blocks.
+    fn read_block_data_from_file(&self, file: &mut File) -> Result<Vec<f32>, String> {
         let mut bytes = Vec::new();
         file.seek(SeekFrom::Start(self.offset as u64))
             .err_to_string("unable to seek through file")?;
-        // TODO: quadrupeling the size is maybe not needed for all data types.
         file.take((self.size * 4) as u64).read_to_end(&mut bytes);
-        let mut f32_buf = [0u8; 4];
-        Ok(bytes
-            .chunks_exact(4)
-            .map(|bytes| {
-                bytes.iter().enumerate().for_each(|(i, x)| f32_buf[i] = *x);
-                f32::from_le_bytes(f32_buf)
-            })
-            .collect())
+
+        let mut res = Vec::with_capacity(self.size);
+        let mut i = 0;
+
+        while i + 4 < bytes.len() {
+            res.push(f32::from_le_bytes([
+                bytes[i],
+                bytes[i + 1],
+                bytes[i + 2],
+                bytes[i + 3],
+            ]));
+            i += 4;
+        }
+        Ok(res)
     }
+
+    fn read_params_from_file(&self, file: &mut File) -> Result<HashMap<String, OpusParam>, String> {
+        let mut bytes = Vec::new();
+        file.seek(SeekFrom::Start(self.offset as u64))
+            .err_to_string("unable to seek through file")?;
+        file.take((self.size * 4) as u64).read_to_end(&mut bytes);
+
+        let mut params = HashMap::new();
+        let mut i = 0;
+
+        // Seven bytes define the parameter, at least one byte needed for data,
+        // thus we need at least 8 bytes in the last iteration.
+        while i + 8 < bytes.len() {
+            let param_name: String = bytes[i..i + 3].iter().map(|b| *b as char).collect();
+
+            if param_name.as_str() == "END" {
+                break;
+            }
+
+            let param_kind = u16::from_le_bytes([bytes[i + 4], bytes[i + 5]]);
+            let param_size = u16::from_le_bytes([bytes[i + 6], bytes[i + 7]]);
+
+            let end_idx = i + 8 + 2 * (param_size as usize);
+            // Make sure we do not access out of bounds.
+            if end_idx > bytes.len() {
+                break;
+            }
+
+            let param_bytes = &bytes[i + 8..end_idx];
+
+            use OpusParam as O;
+            let param_value = match param_kind {
+                0 => O::Integer(u32::from_le_bytes([
+                    param_bytes[0],
+                    param_bytes[1],
+                    param_bytes[2],
+                    param_bytes[3],
+                ])),
+
+                1 => O::Float(f64::from_le_bytes([
+                    param_bytes[0],
+                    param_bytes[1],
+                    param_bytes[2],
+                    param_bytes[3],
+                    param_bytes[4],
+                    param_bytes[5],
+                    param_bytes[6],
+                    param_bytes[7],
+                ])),
+
+                2 | 3 | 4 => O::Text(
+                    param_bytes
+                        .iter()
+                        .filter(|&&b| b != 0)
+                        .map(|b| *b as char)
+                        .collect(),
+                ),
+
+                _ => return Err("failed to parse parameter, invalid type".to_string()),
+            };
+
+            params.insert(param_name, param_value);
+            i += 8 + 2 * (param_size as usize);
+        }
+
+        Ok(params)
+    }
+}
+
+#[derive(Debug, Clone)]
+enum OpusParam {
+    Integer(u32),
+    Float(f64),
+    Text(String),
 }
 
 /// Read all available block definitions from a slice of bytes.
@@ -161,75 +256,103 @@ fn read_block_definitions(buf: &[u8; HEADER_SIZE_BYTES]) -> Vec<BlockDefinition>
     blks
 }
 
-fn parse_bruker_file(path: &Path) -> Result<(), String> {
-    let mut file = File::open(path).err_to_string("failed to open file")?;
-    let mut header_buf = [0u8; HEADER_SIZE_BYTES];
-    file.read_exact(&mut header_buf)
-        .err_to_string("failed to read header")?;
+#[derive(Debug, Clone)]
+pub struct OpusAbsorbanceData {
+    pub wavenumber: Vec<f64>,
+    pub absorbance: Vec<f64>,
+}
 
-    // TODO: to prevent trying to load huge files, check
-    // block sizes and bail out if one block is too large.
-    let blks = read_block_definitions(&header_buf);
+impl OpusAbsorbanceData {
+    pub fn from_path(path: &Path) -> Result<Self, String> {
+        let mut file = File::open(path).err_to_string("failed to open file")?;
+        let mut header_buf = [0u8; HEADER_SIZE_BYTES];
+        file.read_exact(&mut header_buf)
+            .err_to_string("failed to read meta data")?;
 
-    let (Some(absorbance_definition), Some(absorbance_param_definition)) =
-        blks.iter().fold((None, None), |mut acc, b| match b.kind {
-            BlockKind::AB => {
-                acc.0 = Some(b);
-                acc
-            }
-            BlockKind::ABDataParameter => {
-                acc.1 = Some(b);
-                acc
-            }
-            _ => acc,
+        let blks = read_block_definitions(&header_buf);
+
+        let (Some(absorbance_definition), Some(absorbance_param_definition)) =
+            // Collect absorbance data block definition and data parameter definition
+            // into tuple, or return error if these definitions are not found.
+            blks.iter().fold((None, None), |mut acc, b| match b.kind {
+                BlockKind::AB => {
+                    acc.0 = Some(b);
+                    acc
+                }
+                BlockKind::ABDataParameter => {
+                    acc.1 = Some(b);
+                    acc
+                }
+                _ => acc,
+            })
+        else {
+            return Err("file does not contain absorbance data".to_string());
+        };
+
+        let absorbance = absorbance_definition
+            .read_block_data_from_file(&mut file)?
+            .iter()
+            .map(|x| *x as f64)
+            .collect();
+        let params = absorbance_param_definition.read_params_from_file(&mut file)?;
+
+        use OpusParam as O;
+        let Some(O::Float(xmin)) = params.get("LXV").cloned() else {
+            return Err("no data on x-range found".to_string());
+        };
+        let Some(O::Float(xmax)) = params.get("FXV").cloned() else {
+            return Err("no data on x-range found".to_string());
+        };
+
+        let step = (xmax - xmin) / (absorbance_definition.size as f64);
+
+        let mut wavenumber = Vec::with_capacity(absorbance_definition.size);
+        wavenumber.push(xmax);
+
+        // Create the wavenumber data. Keep in mind that in Opus higher
+        // wavenumber is left, lower wavenumber right.
+        let mut x = xmax;
+        while x >= xmin {
+            x -= step;
+            wavenumber.push(x);
+        }
+
+        Ok(OpusAbsorbanceData {
+            wavenumber,
+            absorbance,
         })
-    else {
-        return Err("file does not contain absorbance data".to_string());
-    };
-
-    dbg!(absorbance_definition);
-    dbg!(absorbance_param_definition);
-
-    let data = absorbance_definition.read_from_file(&mut file);
-
-    let mut out = File::create("parsed.dat").unwrap();
-    for x in data.unwrap().iter() {
-        write!(out, "{}\n", x);
     }
 
-    Ok(())
+    fn to_csv(&self, path: &Path) -> Result<(), String> {
+        let mut output_buf = String::with_capacity(self.absorbance.len() * 40);
+
+        for (x, y) in self.wavenumber.iter().zip(self.absorbance.iter()) {
+            write!(output_buf, "{},{}\n", x, y);
+        }
+
+        let mut file = File::create(path).err_to_string("could not create file to save to csv")?;
+        file.write(output_buf.as_bytes())
+            .err_to_string("failed to write csv data to file")?;
+
+        Ok(())
+    }
 }
-
-// ------------------------------- Helpers -----------------------------------
-
-/// Turn a slice of bytes into a u32. Slice must hold exactly 4 bytes.
-fn bytes_to_u32(bytes: &[u8]) -> u32 {
-    assert!(bytes.len() == 4);
-    bytes
-        .iter()
-        .take(4)
-        .enumerate()
-        .map(|(i, x)| (*x as u32) << i * 8)
-        .sum()
-}
-
-// def read_chunk(data: bytes, block_meta):
-//     p1 = block_meta.offset
-//     p2 = p1 + 4 * block_meta.chunk_size
-//     return data[p1:p2]
 
 // -------------------------------- Tests ------------------------------------
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
+    use std::{path::PathBuf, time::SystemTime};
 
     use super::*;
 
     #[test]
     fn test() {
-        let path = PathBuf::from("test-data.0");
-        parse_bruker_file(&path);
+        let path = PathBuf::from_str("test-data.0").unwrap();
+        let data = OpusAbsorbanceData::from_path(&path).unwrap();
+
+        let path = PathBuf::from_str("absorbance.dat").unwrap();
+        data.to_csv(&path);
 
         // let bytes = [0x24, 0x7b, 0x00, 0x00];
         // dbg!(bytes_to_int(&bytes));

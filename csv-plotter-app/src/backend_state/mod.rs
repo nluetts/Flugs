@@ -1,4 +1,4 @@
-mod csv;
+mod data;
 
 use app_core::backend::BackendState;
 use std::{
@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub use csv::CSVData;
+pub use data::PlotData;
 
 #[derive(Default)]
 pub struct BackendAppState {

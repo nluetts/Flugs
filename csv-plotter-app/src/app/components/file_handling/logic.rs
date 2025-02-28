@@ -14,7 +14,7 @@ use crate::{
         },
         DynRequestSender,
     },
-    backend_state::CSVData,
+    backend_state::PlotData,
     BackendAppState,
 };
 
@@ -201,12 +201,12 @@ impl FileHandler {
 pub fn parse_csv(
     path: &Path,
     request_tx: &mut DynRequestSender,
-) -> LinkReceiver<Result<CSVData, String>> {
+) -> LinkReceiver<Result<PlotData, String>> {
     let path = path.to_owned();
     let (rx, linker) = BackendLink::new(
         &format!("load CSV data from file {:?}", path),
         move |_b: &mut BackendEventLoop<BackendAppState>| {
-            CSVData::from_path(&path).map_err(|err| {
+            PlotData::from_path(&path).map_err(|err| {
                 log::error!("{}", err);
                 err
             })

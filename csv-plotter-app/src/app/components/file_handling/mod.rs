@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::app::DynRequestSender;
-use crate::backend_state::CSVData;
+use crate::backend_state::PlotData;
 use app_core::frontend::UIParameter;
 use logic::parse_csv;
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ pub struct FileHandler {
 
 #[derive(Debug)]
 pub struct File {
-    csv_data: UIParameter<Result<CSVData, String>>,
+    csv_data: UIParameter<Result<PlotData, String>>,
     pub path: PathBuf,
     pub properties: FileProperties,
 }

@@ -6,7 +6,7 @@ use std::{
 use app_core::frontend::UIParameter;
 use egui::{text::LayoutJob, Color32, FontId, InputState, Label, Pos2, TextFormat};
 
-use crate::{app::DynRequestSender, backend_state::CSVData};
+use crate::{app::DynRequestSender, backend_state::PlotData};
 
 use super::SearchMode;
 
@@ -234,7 +234,7 @@ fn match_hover_ui(
             ui.label(txt);
             *cursor = egui::CursorIcon::NotAllowed;
         }
-        super::ParsedData::None => match CSVData::from_path(&search_path.value().join(&fp)) {
+        super::ParsedData::None => match PlotData::from_path(&search_path.value().join(&fp)) {
             Ok(data) => *csv_data = super::ParsedData::Ok(data),
             Err(err) => *csv_data = super::ParsedData::Failed(err.to_string()),
         },

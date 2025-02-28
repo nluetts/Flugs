@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 app-core = { workspace = true}
+bruker-parser = {workspace = true}
 svg_plotting = { workspace = true}
 turbo-csv = { workspace = true}
 egui = "0.30"

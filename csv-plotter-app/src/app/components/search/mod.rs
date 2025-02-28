@@ -11,7 +11,7 @@ use std::{
 use app_core::frontend::UIParameter;
 use derive_new::new;
 
-use crate::{app::DynRequestSender, backend_state::CSVData};
+use crate::{app::DynRequestSender, backend_state::PlotData};
 
 pub struct Search {
     pub matches: UIParameter<Vec<Match>>,
@@ -41,7 +41,7 @@ pub struct Match {
 
 #[derive(Debug, Clone)]
 pub enum ParsedData {
-    Ok(CSVData),
+    Ok(PlotData),
     Failed(String),
     None,
 }

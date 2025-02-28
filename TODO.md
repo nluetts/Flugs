@@ -22,7 +22,7 @@ UI:
 
 Search:
 - [x] ~~Do not block the UI when opening new search path via file dialog~~
-- [ ] Allow selection using keyboard up/down in search modal
+- [x] Allow selection using keyboard up/down in search modal
 
 Plotter:
 - [ ] Have a flag to disable/enable the legend
@@ -30,9 +30,11 @@ Plotter:
 Internals:
 - [x] ~~Use array of length 10 for groups instead of hashmap~~
 - [x] ~~Handle UI interactions using an event system?~~
-- [ ] Remove hard coded paths
-  - [ ] Work with configuration file
+- [x] Remove hard coded paths
+  - [.] Work with configuration file
 - [ ] CSV with repeated delimiter (whitespace) should parse correctly
+- [.] Parse Bruker files
+  - Fails for some files, needs debugging
 
 BUGS:
 - [x] ~~Removing one file from group may may delete all files~~

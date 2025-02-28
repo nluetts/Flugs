@@ -1,3 +1,8 @@
+# Testfiles
+*.csv
+*.0
+*.dat
+
 # Mac stuff:
 .DS_Store
 

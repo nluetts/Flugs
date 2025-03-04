@@ -51,13 +51,15 @@ impl super::Search {
                 }
             };
             if i.key_released(egui::Key::ArrowUp) {
-                self.mode = SearchMode::KeyboardSelection;
                 self.selected_match = match self.selected_match {
                     Some(0) => {
                         self.mode = SearchMode::KeyboardInput;
                         None
                     }
-                    Some(n) if n <= 9 => Some(n - 1),
+                    Some(n) if n <= 9 => {
+                        self.mode = SearchMode::KeyboardSelection;
+                        Some(n - 1)
+                    }
                     None => None,
                     _ => unreachable!(),
                 }
@@ -101,6 +103,10 @@ impl super::Search {
             let phrase_input = ui.add(
                 egui::TextEdit::singleline(&mut self.search_query).desired_width(search_text_width),
             );
+
+            if phrase_input.hovered() && ctx.input(|i| i.pointer.is_moving()) {
+                self.mode = SearchMode::KeyboardInput;
+            }
 
             match self.mode {
                 SearchMode::KeyboardInput => phrase_input.request_focus(),
@@ -229,8 +235,9 @@ fn match_hover_ui(
 ) {
     ui.set_min_width(300.0);
     match csv_data {
-        super::ParsedData::Failed(_msg) => {
-            let txt = egui::RichText::new("could not parse this file").color(egui::Color32::RED);
+        super::ParsedData::Failed(msg) => {
+            let msg = format!("could not parse this file:\n{}", msg);
+            let txt = egui::RichText::new(msg).color(egui::Color32::RED);
             ui.label(txt);
             *cursor = egui::CursorIcon::NotAllowed;
         }

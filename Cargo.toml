@@ -3,12 +3,12 @@ resolver = "2"
 members = [
   "app-core",
   "bruker-parser",
-  "csv-plotter-app",
+  "flugs",
   "svg_plotting",
   "turbo-csv",
 ]
 
-default-members = ["app-core", "bruker-parser", "csv-plotter-app", "turbo-csv", "svg_plotting"]
+default-members = ["app-core", "bruker-parser", "flugs", "turbo-csv", "svg_plotting"]
 
 [workspace.dependencies]
 

@@ -205,7 +205,7 @@ impl EguiApp {
 
                 // selection of ui view
                 ui.menu_button("View", |ui| {
-                    ui.selectable_value(&mut self.ui_selection, UISelection::Plot, "Plot");
+                    ui.selectable_value(&mut self.ui_selection, UISelection::Plot, "Export");
                     ui.selectable_value(
                         &mut self.ui_selection,
                         UISelection::FileSettings,

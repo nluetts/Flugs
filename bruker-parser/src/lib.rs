@@ -283,10 +283,7 @@ impl OpusAbsorbanceData {
                     acc.1 = Some(b);
                     acc
                 }
-                other => {
-                    eprintln!("{:?}", other);
-                    acc
-                }
+                other => acc,
             });
         // If we did not find absorbance data, try to retrieve single channel data.
         if maybe_data_definition.is_none() || maybe_params_definition.is_none() {

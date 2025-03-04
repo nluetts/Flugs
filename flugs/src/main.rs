@@ -1,9 +1,9 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 use app_core::backend::BackendEventLoop;
-use csv_plotter::{storage::load_config, BackendAppState, EguiApp};
+use flugs::{storage::load_config, BackendAppState, EguiApp};
 
-const WINDOW_NAME: &str = "PlotMe CSV Plotter";
+const WINDOW_NAME: &str = "Flugs >>";
 const WINDOW_WIDTH: f32 = 400.0;
 const WINDOW_HEIGHT: f32 = 300.0;
 

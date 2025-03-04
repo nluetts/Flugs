@@ -98,7 +98,7 @@ pub fn load_config() -> Option<PathBuf> {
     if home.is_none() {
         log::warn!("could not determine home directory to load config file");
     }
-    let path = home.map(|home| home.join(PathBuf::from(".plotme_global_settings")))?;
+    let path = home.map(|home| home.join(PathBuf::from(".flugs")))?;
     let mut file = std::fs::File::open(path)
         .map_err(|err| log::warn!("could not load config file: {:?}", err))
         .ok()?;

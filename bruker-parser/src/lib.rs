@@ -271,9 +271,9 @@ impl OpusAbsorbanceData {
 
         let blks = read_block_definitions(&header_buf);
 
-        let (Some(absorbance_definition), Some(absorbance_param_definition)) =
-            // Collect absorbance data block definition and data parameter definition
-            // into tuple, or return error if these definitions are not found.
+        // Collect absorbance data block definition and data parameter definition
+        // into tuple.
+        let (mut maybe_data_definition, mut maybe_params_definition) =
             blks.iter().fold((None, None), |mut acc, b| match b.kind {
                 BlockKind::AB => {
                     acc.0 = Some(b);
@@ -283,18 +283,39 @@ impl OpusAbsorbanceData {
                     acc.1 = Some(b);
                     acc
                 }
-                _ => acc,
-            })
+                other => {
+                    eprintln!("{:?}", other);
+                    acc
+                }
+            });
+        // If we did not find absorbance data, try to retrieve single channel data.
+        if maybe_data_definition.is_none() || maybe_params_definition.is_none() {
+            (maybe_data_definition, maybe_params_definition) =
+                blks.iter().fold((None, None), |mut acc, b| match b.kind {
+                    BlockKind::ScSm => {
+                        acc.0 = Some(b);
+                        acc
+                    }
+                    BlockKind::ScSmDataParameter => {
+                        acc.1 = Some(b);
+                        acc
+                    }
+                    other => acc,
+                });
+        }
+
+        let (Some(data_definition), Some(params_definition)) =
+            (maybe_data_definition, maybe_params_definition)
         else {
-            return Err("file does not contain absorbance data".to_string());
+            return Err("file does not contain absorbance or single channel data".to_string());
         };
 
-        let absorbance = absorbance_definition
+        let data = data_definition
             .read_block_data_from_file(&mut file)?
             .iter()
             .map(|x| *x as f64)
             .collect();
-        let params = absorbance_param_definition.read_params_from_file(&mut file)?;
+        let params = params_definition.read_params_from_file(&mut file)?;
 
         use OpusParam as O;
         let Some(O::Float(xmin)) = params.get("LXV").cloned() else {
@@ -304,9 +325,9 @@ impl OpusAbsorbanceData {
             return Err("no data on x-range found".to_string());
         };
 
-        let step = (xmax - xmin) / (absorbance_definition.size as f64);
+        let step = (xmax - xmin) / (data_definition.size as f64);
 
-        let mut wavenumber = Vec::with_capacity(absorbance_definition.size);
+        let mut wavenumber = Vec::with_capacity(data_definition.size);
         wavenumber.push(xmax);
 
         // Create the wavenumber data. Keep in mind that in Opus higher
@@ -319,7 +340,7 @@ impl OpusAbsorbanceData {
 
         Ok(OpusAbsorbanceData {
             wavenumber,
-            absorbance,
+            absorbance: data,
         })
     }
 

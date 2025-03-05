@@ -212,7 +212,7 @@ impl EguiApp {
                         "File Settings",
                     );
                 });
-                if ui.button("Plot").clicked() {
+                if ui.button("Export").clicked() {
                     log::debug!("open dialog to select svg plot path");
                     let handle = std::thread::spawn(|| {
                         rfd::FileDialog::new().set_file_name("plot.svg").save_file()

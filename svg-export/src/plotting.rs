@@ -631,34 +631,8 @@ impl Element for Ticks {
 
 impl Ticks {
     fn format_ticks(&self) -> (Vec<String>, Vec<String>) {
-        // Formatter functions for the tick labels.
-        let x_fmt = |xi| {
-            if self
-                .xpos
-                .iter()
-                .filter(|x| **x != 0.0)
-                .any(|x| (*x).abs() < 1e-3 || (*x).abs() > 1e4)
-            {
-                format!("{xi:.2E}")
-            } else {
-                format!("{xi}")
-            }
-        };
-        let y_fmt = |yi| {
-            if self
-                .ypos
-                .iter()
-                .filter(|y| **y != 0.0)
-                .any(|y| (*y).abs() < 1e-3 || (*y).abs() > 1e3)
-            {
-                format!("{yi:.2E}")
-            } else {
-                format!("{yi}")
-            }
-        };
-
-        let xtick_labels = self.xpos.iter().map(|x| x_fmt(x)).collect();
-        let ytick_labels = self.ypos.iter().map(|y| y_fmt(y)).collect();
+        let xtick_labels = format_ticks(&self.xpos);
+        let ytick_labels = format_ticks(&self.ypos);
 
         (xtick_labels, ytick_labels)
     }
@@ -769,10 +743,83 @@ pub fn element_opts(items: &[(&str, &str)]) -> svg::Params {
         .collect()
 }
 
+fn format_ticks(tick_positions: &[f64]) -> Vec<String> {
+    let (magnitude_min, magnitude_max, mag_increment) =
+        ticks_magnitude_and_increment(tick_positions);
+
+    let fmt_fun = match (magnitude_min, magnitude_max, mag_increment) {
+        // The min/max magnitude are not used right now, but maybe I realise
+        // I need them in the future. Formatting ticks is tricky ...
+        (_, _, i8::MIN..=-4) => |z| format!("{z:.2e}"),
+        (_, _, -3) => |z| format!("{z:.4}"),
+        (_, _, -2) => |z| format!("{z:.3}"),
+        (_, _, -1) => |z| format!("{z:.1}"),
+        (_, _, 0) => |z| format!("{z:.1}"),
+        (_, _, 1..=4) => |z| format!("{z:.0}"),
+        (_, _, 5..=i8::MAX) => |z| format!("{z:.0e}"),
+    };
+
+    tick_positions.iter().map(fmt_fun).collect()
+}
+
+fn ticks_magnitude_and_increment(tick_positions: &[f64]) -> (i8, i8, i8) {
+    let (magnitude_min, magnitude_max) =
+        tick_positions
+            .iter()
+            .filter(|y| **y != 0.0)
+            .fold((f64::MAX, f64::MIN), |mut acc, x| {
+                let mag_x = x.abs().log10();
+                if mag_x < acc.0 {
+                    acc.0 = mag_x
+                };
+                if mag_x > acc.1 {
+                    acc.1 = mag_x
+                };
+                acc
+            });
+    let mag_increment = {
+        let n = tick_positions.len() - 1;
+        let mut acc = 0.0;
+        for (zi, zj) in tick_positions.iter().zip(tick_positions.iter().skip(1)) {
+            acc += (zj - zi).abs();
+        }
+        (acc / n as f64).log10()
+    };
+    (
+        magnitude_min.floor() as i8,
+        magnitude_max.floor() as i8,
+        mag_increment.floor() as i8,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_figure_creation() {}
+    fn test_ticks_magnitude_and_increment_1() {
+        let pos = vec![0.001, 0.002, 0.003, 0.004];
+        let (magnitude_min, magnitude_max, mag_increment) = ticks_magnitude_and_increment(&pos);
+        assert_eq!(mag_increment, -3);
+        assert_eq!(magnitude_min, -3);
+        assert_eq!(magnitude_max, -3);
+    }
+
+    #[test]
+    fn test_ticks_magnitude_and_increment_2() {
+        let pos = vec![0.001, 1.002, 2.003, 3.004];
+        let (magnitude_min, magnitude_max, mag_increment) = ticks_magnitude_and_increment(&pos);
+        assert_eq!(mag_increment, 0);
+        assert_eq!(magnitude_min, -3);
+        assert_eq!(magnitude_max, 0);
+    }
+
+    #[test]
+    fn test_ticks_magnitude_and_increment_3() {
+        let pos = vec![10000.0, 12000.0, 14000.0, 16000.0, 18000.0, 20000.0];
+        let (magnitude_min, magnitude_max, mag_increment) = ticks_magnitude_and_increment(&pos);
+        assert_eq!(mag_increment, 3);
+        assert_eq!(magnitude_min, 4);
+        assert_eq!(magnitude_max, 4);
+    }
 }

@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 app-core = { workspace = true}
 bruker-parser = {workspace = true}
-svg_plotting = { workspace = true}
+svg-export = { workspace = true}
 turbo-csv = { workspace = true}
 egui = "0.30"
 eframe = { version = "0.30", default-features = false, features = [

@@ -35,7 +35,7 @@ impl super::Plotter {
 }
 
 pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
-    use svg_plotting::{self, Axis, Figure, LinePlot};
+    use svg_export::{self, Axis, Figure, LinePlot};
 
     log::debug!("requested to save svg at '{:?}'", path);
 
@@ -94,9 +94,9 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
                     plot_file.properties.yoffset,
                 );
                 let label = if !plot_file.properties.alias.is_empty() {
-                    &plot_file.properties.alias
+                    format!("{} ({})", &plot_file.properties.alias, grp.name)
                 } else {
-                    plot_file.file_name()
+                    format!("{} ({})", plot_file.file_name(), grp.name)
                 };
                 log::debug!("plotting line with label {}", label);
                 let line = LinePlot::new(
@@ -108,7 +108,7 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
                 )
                 .with_color(&color)
                 .with_linewidth(1.0)
-                .with_name(label);
+                .with_name(&label);
 
                 ax.add_line(line);
             }

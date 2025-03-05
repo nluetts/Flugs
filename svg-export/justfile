@@ -1,0 +1,2 @@
+test:
+	RUSTFLAGS=-Awarnings cargo test --lib -- --nocapture

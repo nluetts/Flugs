@@ -4,15 +4,15 @@ members = [
   "app-core",
   "bruker-parser",
   "flugs",
-  "svg_plotting",
+  "svg-export",
   "turbo-csv",
 ]
 
-default-members = ["app-core", "bruker-parser", "flugs", "turbo-csv", "svg_plotting"]
+default-members = ["app-core", "bruker-parser", "flugs", "turbo-csv", "svg-export"]
 
 [workspace.dependencies]
 
 app-core = { path = "app-core" }
 bruker-parser = { path = "bruker-parser" }
-svg_plotting = { path = "svg_plotting" }
+svg-export = { path = "svg-export" }
 turbo-csv = { path = "turbo-csv" }

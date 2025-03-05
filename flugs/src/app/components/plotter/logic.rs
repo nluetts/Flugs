@@ -10,6 +10,7 @@ impl super::Plotter {
         active_file: &mut File,
         modifiers: [bool; 3],
         drag: Vec2,
+        yspan: f64,
     ) {
         // How much did the mouse move?
         let Vec2 { x: dx, y: dy } = drag;
@@ -25,7 +26,7 @@ impl super::Plotter {
             // Shift is pressed → change yscale.
             [false, false, true] => {
                 let yscale = active_file.properties.yscale;
-                active_file.properties.yscale += yscale * 0.03 * (dy as f64);
+                active_file.properties.yscale += yscale * 3.0 / yspan * (dy as f64);
             }
             // If several modifiers are pressed at the same time,
             // we ignore the input.

@@ -57,7 +57,8 @@ impl super::Plotter {
                     let [xmin, ymin] = plot_ui.plot_bounds().min();
                     let [xmax, ymax] = plot_ui.plot_bounds().max();
                     [xmin, xmax, ymin, ymax]
-                }
+                };
+                plot_ui.plot_bounds()
             });
 
         // Get modifier input (we need this here already, to disallow the plot
@@ -85,9 +86,10 @@ impl super::Plotter {
             .selected_fid
             .and_then(|fid| file_handler.registry.get_mut(&fid))
         {
+            let yspan = response.inner.height();
             let should_modify = modifier_down && drag.length() > 0.0;
             if should_modify {
-                self.manipulate_file(selected_file, modifiers, drag);
+                self.manipulate_file(selected_file, modifiers, drag, yspan);
             }
         }
     }

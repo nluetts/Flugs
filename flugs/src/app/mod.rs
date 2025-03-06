@@ -1,4 +1,5 @@
 mod components;
+pub mod config;
 mod events;
 pub mod storage;
 
@@ -6,8 +7,9 @@ use self::components::{Plotter, Search};
 use crate::app::events::EventQueue;
 use crate::BackendAppState;
 use app_core::backend::BackendRequest;
+use config::Config;
 use events::{SaveLoadRequested, SavePlotRequested};
-use storage::{load_config, load_json, save_json};
+use storage::{load_json, save_json};
 
 pub use crate::app::components::FileHandler;
 
@@ -16,6 +18,7 @@ use std::{sync::mpsc::Sender, thread::JoinHandle, time::Duration};
 pub type DynRequestSender = Sender<Box<dyn BackendRequest<BackendAppState>>>;
 
 pub struct EguiApp {
+    config: Config,
     backend_thread_handle: Option<JoinHandle<()>>,
     file_handler: FileHandler,
     plotter: Plotter,
@@ -44,19 +47,15 @@ impl UISelection {
 impl EguiApp {
     pub fn new(
         _cc: &eframe::CreationContext<'_>,
+        config: Config,
         request_tx: Sender<Box<dyn BackendRequest<BackendAppState>>>,
         backend_thread_handle: JoinHandle<()>,
     ) -> Self {
-        // Load the config from the settings file:
-        #[allow(deprecated)]
-        let search_path =
-            load_config().unwrap_or(std::env::home_dir().expect("Could not set root search path!"));
-        // initialize search component with root path and index
-        // subpaths
         let mut search = Search::new(request_tx.clone());
-        search.set_search_path(&search_path);
+        search.set_search_path(&config.search_path);
 
         Self {
+            config,
             backend_thread_handle: Some(backend_thread_handle),
             file_handler: Default::default(),
             plotter: Plotter::new(),

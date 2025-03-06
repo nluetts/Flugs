@@ -50,12 +50,12 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
 
     let [xmin, xmax, ymin, ymax] = app.plotter.current_plot_bounds;
 
-    let mut fig = Figure::empty(800, 600);
+    let mut fig = Figure::empty(app.config.svg_width, app.config.svg_height);
     let mut ax = Axis::default()
         .with_xlim(xmin, xmax)
         .with_ylim(ymin, ymax)
-        .with_xlabel("x-label")
-        .with_ylabel("ylabel")
+        .with_xlabel(&app.config.x_label)
+        .with_ylabel(&app.config.y_label)
         .with_legend(true);
 
     for (_, grp) in app

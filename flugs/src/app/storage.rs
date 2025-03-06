@@ -1,8 +1,6 @@
 use std::{
     collections::HashMap,
-    io::Read,
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
 use app_core::storage::Storage;
@@ -89,34 +87,4 @@ impl FrontendStorage {
 
         FileHandler::new(groups, registry, self.next_id)
     }
-}
-
-pub fn load_config() -> Option<PathBuf> {
-    let mut search_path = None;
-    #[allow(deprecated)]
-    let home = std::env::home_dir();
-    if home.is_none() {
-        log::warn!("could not determine home directory to load config file");
-    }
-    let path = home.map(|home| home.join(PathBuf::from(".flugs")))?;
-    let mut file = std::fs::File::open(path)
-        .map_err(|err| log::warn!("could not load config file: {:?}", err))
-        .ok()?;
-    let mut buf = String::new();
-    file.read_to_string(&mut buf).ok()?;
-    for line in buf.lines() {
-        let mut iter = line.split("=");
-        let key = iter.next();
-        let val = iter.next();
-        let (key, val) = match (key, val) {
-            (Some(key), Some(val)) => (key, val),
-            _ => continue,
-        };
-        if key == "search_path" {
-            let _ = PathBuf::from_str(val).map(|path| {
-                search_path = Some(path);
-            });
-        }
-    }
-    search_path
 }

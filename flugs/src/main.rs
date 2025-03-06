@@ -1,7 +1,7 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 use app_core::backend::BackendEventLoop;
-use flugs::{storage::load_config, BackendAppState, EguiApp};
+use flugs::{BackendAppState, Config, EguiApp};
 
 const WINDOW_NAME: &str = "Flugs >>";
 const WINDOW_WIDTH: f32 = 400.0;
@@ -13,9 +13,13 @@ fn main() -> eframe::Result {
     // start backend loop
     let (command_tx, command_rx) = std::sync::mpsc::channel();
     #[allow(deprecated)]
-    let search_path =
-        load_config().unwrap_or(std::env::home_dir().expect("Could not set root search path!"));
-    let backend_state = BackendAppState::new(search_path);
+    let config = if let Ok(config) = Config::from_config_file() {
+        config
+    } else {
+        log::warn!("unable to load config file \".flugs\" from home directory");
+        Config::default()
+    };
+    let backend_state = BackendAppState::new(config.search_path.clone());
     let eventloop_handle = BackendEventLoop::new(command_rx, backend_state).run();
 
     let native_options = eframe::NativeOptions {
@@ -27,6 +31,13 @@ fn main() -> eframe::Result {
     eframe::run_native(
         WINDOW_NAME,
         native_options,
-        Box::new(|cc| Ok(Box::new(EguiApp::new(cc, command_tx, eventloop_handle)))),
+        Box::new(|cc| {
+            Ok(Box::new(EguiApp::new(
+                cc,
+                config,
+                command_tx,
+                eventloop_handle,
+            )))
+        }),
     )
 }

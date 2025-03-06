@@ -33,7 +33,7 @@ impl FileHandler {
             ui.heading("Groups and Files")
         });
 
-        let scroll_area = egui::ScrollArea::both().max_width(400.0);
+        let scroll_area = egui::ScrollArea::both();
 
         let side_panel = egui::panel::SidePanel::left("file_and_group_tree").min_width(300.0);
         side_panel.show(ctx, |ui| {

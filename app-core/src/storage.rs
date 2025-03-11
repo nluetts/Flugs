@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{from_reader, to_writer};
-use std::{io::Read, os::fd::AsFd, path::Path, str::FromStr};
+use std::{io::Read, path::Path, str::FromStr};
 
 use super::string_error::ErrorStringExt;
 

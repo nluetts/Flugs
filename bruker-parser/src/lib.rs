@@ -5,7 +5,6 @@ use std::{
     fmt::Write as fmtWrite,
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
-    os::unix::fs::FileExt,
     path::{Path, PathBuf},
     str::FromStr,
     time::SystemTime,

@@ -325,6 +325,10 @@ impl Axis {
     /// (at the crossing of the axis). Furthermore, the data is subdivided into
     /// segments at each axis crossing, so it can be rendered with several svg
     /// polyline elements.
+    ///
+    /// Additionally, the function splits the data into segments whenever
+    /// NaN values are encountered, because NaNs in the SVG output lead
+    /// to the polyline not being drawn fully.
     fn segment_lineplot_data(&self, line: &LinePlot) -> Vec<(Vec<f64>, Vec<f64>)> {
         let (xs, ys) = (&line.xs[..], &line.ys[..]);
         let (nx, ny) = (xs.len(), ys.len());
@@ -352,7 +356,15 @@ impl Axis {
         let mut segments = vec![(Vec::<f64>::new(), Vec::<f64>::new())];
 
         // Iterate datapoints and build up segemnts
-        for i in 1..(n - 1) {
+        for i in 0..(n - 1) {
+            // If a datapoint is infity or NaN, we start a new segment
+            // and ignore the point.
+            if !xs[i].is_finite() || !ys[i].is_finite() {
+                if !segments.last().unwrap().0.is_empty() {
+                    segments.push((Vec::<f64>::new(), Vec::<f64>::new()));
+                }
+                continue;
+            }
             // Current datapoints normalized to axis from 0 to 1 in both x and y
             // directions. This normalization makes later checks and calculations
             // of crossings easier.
@@ -394,6 +406,9 @@ impl Axis {
                 });
                 // If (i + 1)th datapoint is also within axis, we do not need to check
                 // for crossings ...
+                if outside(i + 1) {
+                    dbg!(xs[i], ys[i], xs[i + 1], ys[i + 1]);
+                }
                 if !outside(i + 1) {
                     // ... but we have to check if it is the last point, because then
                     // we have to add it to the current (and last) segment.

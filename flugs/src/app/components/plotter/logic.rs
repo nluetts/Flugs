@@ -100,16 +100,37 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
                     format!("{} ({})", plot_file.file_name(), grp.name)
                 };
                 log::debug!("plotting line with label {}", label);
-                let line = LinePlot::new(
-                    &cached_data.iter().map(|[x, _]| *x + x0).collect::<Vec<_>>(),
-                    &cached_data
-                        .iter()
-                        .map(|[_, y]| (*y * scale) + y0)
-                        .collect::<Vec<_>>(),
-                )
-                .with_color(&color)
-                .with_linewidth(1.0)
-                .with_name(&label);
+
+                // Downsample to a maximum of 1000 points.
+                // TODO: Make this a number of points a global option.
+                // let window_size = cached_data.len() / 1000;
+                // let xs: Vec<_> = cached_data
+                //     .chunks(window_size)
+                //     .map(|vals| vals.iter().map(|[x, _]| x + x0).sum::<f64>() / vals.len() as f64)
+                //     .collect();
+                // let ys: Vec<_> = cached_data
+                //     .chunks(window_size)
+                //     .map(|vals| {
+                //         vals.iter().map(|[_, y]| (y * scale) + y0).sum::<f64>() / window_size as f64
+                //     })
+                //     .collect();
+                //
+
+                let xs: Vec<_> = cached_data.iter().map(|[x, _]| x + x0).collect();
+                let ymin = cached_data
+                    .iter()
+                    .map(|[_, y]| y)
+                    .reduce(|current_min, yi| if yi < current_min { yi } else { current_min })
+                    .unwrap_or(&0.0);
+                let ys: Vec<_> = cached_data
+                    .iter()
+                    .map(|[_, y]| (y - ymin) * scale + y0 + ymin)
+                    .collect();
+
+                let line = LinePlot::new(&xs, &ys)
+                    .with_color(&color)
+                    .with_linewidth(1.0)
+                    .with_name(&label);
 
                 ax.add_line(line);
             }

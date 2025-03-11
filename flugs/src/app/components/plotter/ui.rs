@@ -102,13 +102,18 @@ impl super::Plotter {
         plot_iu: &mut egui_plot::PlotUi,
     ) -> egui::Id {
         if let Some(data) = file.get_cache() {
+            let ymin = data
+                .iter()
+                .map(|[_, y]| y)
+                .reduce(|current_min, yi| if yi < current_min { yi } else { current_min })
+                .unwrap_or(&0.0);
             // Apply custom shifting/scaling to data.
             let data: Vec<[f64; 2]> = data
                 .iter()
                 .map(|[x, y]| {
                     [
                         x + file.properties.xoffset,
-                        y * file.properties.yscale + file.properties.yoffset,
+                        (y - ymin) * file.properties.yscale + file.properties.yoffset + ymin,
                     ]
                 })
                 .collect();

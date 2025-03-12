@@ -21,11 +21,59 @@ impl super::Plotter {
         let mut spans = (0.0, 0.0);
         let mut drag = Vec2::default();
 
+        let auto_bounds = self.mode == super::PlotterMode::Display;
+        let allow_drag = self.selected_fid.is_none() && self.mode == super::PlotterMode::Display;
+
         self.files_plot_ids.drain();
         let response = egui_plot::Plot::new("Plot")
-            .allow_drag(self.selected_fid.is_none())
+            .allow_drag(allow_drag)
+            .auto_bounds(egui::Vec2b {
+                x: auto_bounds,
+                y: auto_bounds,
+            })
             .legend(Legend::default())
             .show(ui, |plot_ui| {
+                // Plot integration region, if intgrate mode is active.
+                if let super::PlotterMode::Integrate = self.mode {
+                    if let Some((xmin, xmax)) = self.current_integral {
+                        let y = plot_ui.plot_bounds().center().y;
+                        plot_ui.line(
+                            egui_plot::Line::new(vec![[xmin, y], [xmax, y]])
+                                .color(egui::Color32::RED)
+                                .width(3.0),
+                        );
+                    }
+                    // Handle mouse clicks (draging integral area).
+                    //
+                    // Reading this before the if statement is required to avoid a dead lock.
+                    let inside_plot = pointer_inside_plot(&plot_ui);
+                    plot_ui.ctx().input(|i| {
+                        if i.pointer.button_down(egui::PointerButton::Primary)
+                            && plot_ui.response().contains_pointer()
+                            && inside_plot
+                        {
+                            match (i.pointer.press_origin(), i.pointer.latest_pos()) {
+                                (Some(origin), Some(current_position)) => {
+                                    // Pointer positions are in screen coordinates and must be translated into
+                                    // the coordinate system of the plot.
+                                    let origin =
+                                        plot_ui.transform().value_from_position(origin).x as f64;
+                                    let current_position =
+                                        plot_ui.transform().value_from_position(current_position).x
+                                            as f64;
+                                    // The values must be sorted ascendingly when stored in `current_integral`.
+                                    let (origin, current_position) = (
+                                        origin.min(current_position),
+                                        origin.max(current_position),
+                                    );
+                                    self.current_integral = Some((origin, current_position))
+                                }
+                                _ => {}
+                            }
+                        }
+                    });
+                }
+
                 for (_, grp) in file_handler
                     .groups
                     .iter_mut()
@@ -58,6 +106,7 @@ impl super::Plotter {
                     let [xmax, ymax] = plot_ui.plot_bounds().max();
                     [xmin, xmax, ymin, ymax]
                 };
+
                 plot_ui.plot_bounds()
             });
 
@@ -86,6 +135,7 @@ impl super::Plotter {
             .selected_fid
             .and_then(|fid| file_handler.registry.get_mut(&fid))
         {
+            // `yspan` is needed to determine speed of y-scaling.
             let yspan = response.inner.height();
             let should_modify = modifier_down && drag.length() > 0.0;
             if should_modify {
@@ -139,6 +189,27 @@ impl super::Plotter {
                     .id(egui_id),
             );
 
+            if self.mode == super::PlotterMode::Integrate {
+                if let Some((xmin, xmax)) = self.current_integral {
+                    plot_iu.line(
+                        egui_plot::Line::new(
+                            data.iter()
+                                .filter_map(|[x, y]| {
+                                    if x >= &xmin && x <= &xmax {
+                                        Some([*x, *y])
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect::<Vec<[f64; 2]>>(),
+                        )
+                        .color(egui::Color32::from_rgba_premultiplied(255, 255, 255, 100))
+                        .width(width)
+                        .id(egui_id),
+                    );
+                }
+            }
+
             egui_id
         } else {
             // This should never happen because if the filter applied in
@@ -149,6 +220,48 @@ impl super::Plotter {
             )
         }
     }
+
+    pub fn integrate_menu(&mut self, file_handler: &mut FileHandler, ui: &mut egui::Ui) {
+        ui.menu_button("Measure Integral", |ui| {
+            if ui.button("Reset").clicked() {
+                self.current_integral = None
+            }
+            if let super::PlotterMode::Integrate = self.mode {
+                ui.checkbox(
+                    &mut self.integrate_with_local_baseline,
+                    "Use local baseline?",
+                );
+            }
+            if let Some((a, b)) = self.current_integral.iter_mut().next() {
+                ui.label(format!("Left bound: {a:.2e}"));
+                ui.label(format!("Right bound: {b:.2e}"));
+
+                for (_, grp) in file_handler
+                    .groups
+                    .iter_mut()
+                    .enumerate()
+                    .filter_map(|(id, x)| Some(id).zip(x.as_mut()))
+                {
+                    if !grp.is_plotted {
+                        continue;
+                    }
+                    for fid in grp.file_ids.iter() {
+                        if let Some(file) = file_handler
+                            .registry
+                            .get(fid)
+                            .filter(|file| file.get_cache().is_some())
+                        {
+                            ui.label(file.file_name());
+                        }
+                    }
+                }
+            } else {
+                if ui.button("New Region").clicked() {
+                    self.current_integral = Some((0.0, 0.0));
+                }
+            }
+        });
+    }
 }
 
 pub fn auto_color(color_idx: i32) -> egui::Color32 {
@@ -156,4 +269,18 @@ pub fn auto_color(color_idx: i32) -> egui::Color32 {
     let golden_ratio = (5.0_f32.sqrt() - 1.0) / 2.0; // 0.61803398875
     let h = color_idx as f32 * golden_ratio;
     egui::epaint::Hsva::new(h, 0.85, 0.5, 1.0).into()
+}
+
+fn pointer_inside_plot(plot_ui: &egui_plot::PlotUi) -> bool {
+    if let Some(pointer_position) = plot_ui.pointer_coordinate() {
+        return plot_ui
+            .plot_bounds()
+            .range_x()
+            .contains(&pointer_position.x)
+            && plot_ui
+                .plot_bounds()
+                .range_y()
+                .contains(&pointer_position.y);
+    }
+    return false;
 }

@@ -12,6 +12,7 @@ use events::{SaveLoadRequested, SavePlotRequested};
 use storage::{load_json, save_json};
 
 pub use crate::app::components::FileHandler;
+pub use crate::app::components::PlotterMode;
 
 use std::{sync::mpsc::Sender, thread::JoinHandle, time::Duration};
 
@@ -202,15 +203,29 @@ impl EguiApp {
                     }
                 });
 
-                // selection of ui view
+                // Selection of ui view.
                 ui.menu_button("View", |ui| {
-                    ui.selectable_value(&mut self.ui_selection, UISelection::Plot, "Export");
+                    ui.selectable_value(&mut self.ui_selection, UISelection::Plot, "Plot");
                     ui.selectable_value(
                         &mut self.ui_selection,
                         UISelection::FileSettings,
                         "File Settings",
                     );
                 });
+
+                ui.menu_button("Mode", |ui| {
+                    ui.selectable_value(
+                        &mut self.plotter.mode,
+                        crate::app::PlotterMode::Display,
+                        "Display Plots",
+                    );
+                    ui.selectable_value(
+                        &mut self.plotter.mode,
+                        crate::app::PlotterMode::Integrate,
+                        "Integrate",
+                    );
+                });
+
                 if ui.button("Export").clicked() {
                     log::debug!("open dialog to select svg plot path");
                     let handle = std::thread::spawn(|| {
@@ -221,6 +236,10 @@ impl EguiApp {
                 };
 
                 ui.toggle_value(&mut self.shortcuts_modal_open, "Help (F1)");
+
+                if let crate::app::PlotterMode::Integrate = self.plotter.mode {
+                    self.plotter.integrate_menu(&mut self.file_handler, ui);
+                }
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     egui::widgets::global_theme_preference_buttons(ui);

@@ -13,6 +13,15 @@ pub struct Plotter {
     files_plot_ids: HashMap<egui::Id, FileID>,
     selected_fid: Option<FileID>,
     current_plot_bounds: [f64; 4],
+    current_integral: Option<(f64, f64)>,
+    integrate_with_local_baseline: bool,
+    pub mode: PlotterMode,
+}
+
+#[derive(PartialEq)]
+pub enum PlotterMode {
+    Display,
+    Integrate,
 }
 
 impl Plotter {
@@ -21,6 +30,10 @@ impl Plotter {
             files_plot_ids: HashMap::with_capacity(10),
             selected_fid: None,
             current_plot_bounds: [0.0, 0.0, 0.0, 0.0],
+            current_integral: None,
+            mode: PlotterMode::Display,
+            // TODO: make this a global option
+            integrate_with_local_baseline: true,
         }
     }
 }

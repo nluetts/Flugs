@@ -228,7 +228,7 @@ impl AppEvent for SavePlotRequested {
                 }
                 Ok(None) => (),
                 Err(err) => {
-                    log::error!("Unable to save plot: {:?}", err)
+                    log::error!("unable to save plot: {:?}", err)
                 }
             };
             Ok(EventState::Finished)

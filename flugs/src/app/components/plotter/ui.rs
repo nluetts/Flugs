@@ -43,6 +43,17 @@ impl super::Plotter {
                                 .width(3.0),
                         );
                     }
+
+                    // Context menu based on current mode.
+                    match self.mode {
+                        super::PlotterMode::Display => {}
+                        super::PlotterMode::Integrate => {
+                            plot_ui
+                                .response()
+                                .context_menu(|ui| self.integrate_menu(file_handler, ui));
+                        }
+                    }
+
                     // Handle mouse clicks (draging integral area).
                     //
                     // Reading this before the if statement is required to avoid a dead lock.
@@ -61,11 +72,6 @@ impl super::Plotter {
                                     let current_position =
                                         plot_ui.transform().value_from_position(current_position).x
                                             as f64;
-                                    // The values must be sorted ascendingly when stored in `current_integral`.
-                                    let (origin, current_position) = (
-                                        origin.min(current_position),
-                                        origin.max(current_position),
-                                    );
                                     self.current_integral = Some((origin, current_position))
                                 }
                                 _ => {}
@@ -191,6 +197,7 @@ impl super::Plotter {
 
             if self.mode == super::PlotterMode::Integrate {
                 if let Some((xmin, xmax)) = self.current_integral {
+                    let (xmin, xmax) = (xmin.min(xmax), xmin.max(xmax));
                     plot_iu.line(
                         egui_plot::Line::new(
                             data.iter()
@@ -222,45 +229,96 @@ impl super::Plotter {
     }
 
     pub fn integrate_menu(&mut self, file_handler: &mut FileHandler, ui: &mut egui::Ui) {
-        ui.menu_button("Measure Integral", |ui| {
-            if ui.button("Reset").clicked() {
-                self.current_integral = None
-            }
-            if let super::PlotterMode::Integrate = self.mode {
-                ui.checkbox(
-                    &mut self.integrate_with_local_baseline,
-                    "Use local baseline?",
-                );
-            }
-            if let Some((a, b)) = self.current_integral.iter_mut().next() {
-                ui.label(format!("Left bound: {a:.2e}"));
-                ui.label(format!("Right bound: {b:.2e}"));
+        ui.set_min_width(200.0);
 
-                for (_, grp) in file_handler
-                    .groups
-                    .iter_mut()
-                    .enumerate()
-                    .filter_map(|(id, x)| Some(id).zip(x.as_mut()))
-                {
-                    if !grp.is_plotted {
-                        continue;
-                    }
-                    for fid in grp.file_ids.iter() {
-                        if let Some(file) = file_handler
-                            .registry
-                            .get(fid)
-                            .filter(|file| file.get_cache().is_some())
-                        {
-                            ui.label(file.file_name());
-                        }
-                    }
+        // UI to set integral bounds.
+        ui.heading("Integral Bounds");
+
+        // Reset the chosen integral.
+        if ui.button("Reset").clicked() {
+            self.current_integral = None
+        }
+        // Baseline handling.
+        ui.checkbox(
+            &mut self.integrate_with_local_baseline,
+            "Use local baseline?",
+        );
+        ui.checkbox(
+            &mut self.auto_shift_after_scaling,
+            "Align curves after scaling?",
+        );
+        // Integration window.
+        if let Some((a, b)) = self.current_integral.iter_mut().next() {
+            let [xmin, xmax, _, _] = self.current_plot_bounds;
+            ui.label("Left bound");
+            ui.add(egui::DragValue::new(a).speed((xmax - xmin).abs() / 500.0))
+                .on_hover_cursor(egui::CursorIcon::Text);
+            ui.label("Right bound");
+            ui.add(egui::DragValue::new(b).speed((xmax - xmin).abs() / 500.0))
+                .on_hover_cursor(egui::CursorIcon::Text);
+
+            ui.separator();
+
+            // UI to trigger scaling by integral.
+            ui.heading("Scale by Integral");
+
+            let scale_all = ui
+                .button("All")
+                .on_hover_ui(|ui| {
+                    ui.label("scale all currently plotted datasets by their integral");
+                })
+                .clicked();
+
+            // Scale button for each file.
+            for (_, grp) in file_handler
+                .groups
+                .iter_mut()
+                .enumerate()
+                .filter_map(|(id, x)| Some(id).zip(x.as_mut()))
+            {
+                if !grp.is_plotted {
+                    continue;
                 }
-            } else {
-                if ui.button("New Region").clicked() {
-                    self.current_integral = Some((0.0, 0.0));
+                for fid in grp.file_ids.iter() {
+                    if let Some(file) = file_handler
+                        .registry
+                        .get_mut(fid)
+                        .filter(|file| file.get_cache().is_some())
+                    {
+                        let label_text = if file.properties.alias.is_empty() {
+                            file.file_name().to_owned()
+                        } else {
+                            file.properties.alias.to_owned()
+                        };
+                        ui.horizontal(|ui| {
+                            let scale_button = egui::Button::new(label_text.clone()).truncate();
+                            let area = file.integrate(*a, *b, self.integrate_with_local_baseline);
+                            if scale_all
+                                || ui
+                                    .add(scale_button)
+                                    .on_hover_ui(|ui| {
+                                        ui.label(label_text);
+                                        ui.label(format!("(area = {area})"));
+                                    })
+                                    .clicked()
+                            {
+                                // Scale by inverse of area.
+                                file.properties.yscale = 1.0 / area;
+                                // Optionally shift curve to make all plots align automatically.
+                                if self.auto_shift_after_scaling {
+                                    let offset = file.local_minimum(*a, *b, false);
+                                    file.properties.yoffset = offset;
+                                }
+                            }
+                        });
+                    }
                 }
             }
-        });
+        } else {
+            if ui.button("New Region").clicked() {
+                self.current_integral = Some((0.0, 0.0));
+            }
+        }
     }
 }
 

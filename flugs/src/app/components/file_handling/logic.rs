@@ -22,11 +22,120 @@ use super::{File, FileHandler, FileID, Group};
 
 impl File {
     pub fn get_cache(&self) -> Option<&Vec<[f64; 2]>> {
-        self.csv_data
+        self.data
             .value()
             .as_ref()
             .map(|dat| &dat.get_cache().data)
             .ok()
+    }
+
+    // Integrate data numerically using trapezoidal method.
+    //
+    // Returns NaN if something goes wrong.
+    pub fn integrate(&mut self, left: f64, right: f64, local_baseline: bool) -> f64 {
+        // Retrieve its data, if it was parsed correctly.
+        let Ok(data) = self.data.value() else {
+            log::error!(
+                "File {} was not parsed correctly, cannot integrate",
+                self.file_name()
+            );
+            return f64::NAN;
+        };
+
+        // Retrieve x and y data.
+        let msg = format!(
+            "File {} needs at least two columns for integration",
+            self.file_name()
+        );
+
+        // TODO: in the end we want to have the columns to be selectable.
+        let Some(xs) = data.columns.get(0) else {
+            log::error!("{msg}");
+            return f64::NAN;
+        };
+        let Some(ys) = data.columns.get(1) else {
+            log::error!("{msg}");
+            return f64::NAN;
+        };
+
+        // Filter out data points where both x- and y-value are finite and not NaN.
+        let (xs, ys) = xs
+            .iter()
+            .zip(ys)
+            .filter(|(x, y)| x.is_finite() && y.is_finite())
+            .fold(
+                (Vec::with_capacity(xs.len()), Vec::with_capacity(xs.len())),
+                |(mut xs, mut ys), (x, y)| {
+                    xs.push(*x);
+                    ys.push(*y);
+                    (xs, ys)
+                },
+            );
+
+        // Apply trapezoidal integration.
+        let area = match trapz(&xs, &ys, left, right, local_baseline) {
+            Ok(area) => area,
+            Err(err) => {
+                log::error!("Failed to integrate file {}: {err}", self.file_name());
+                return f64::NAN;
+            }
+        };
+
+        area
+    }
+
+    pub fn local_minimum(&mut self, left: f64, right: f64, after_scaling: bool) -> f64 {
+        // Retrieve its data, if it was parsed correctly.
+        let Ok(data) = self.data.value() else {
+            log::error!(
+                "File {} was not parsed correctly, cannot determine local minimum ",
+                self.file_name()
+            );
+            return f64::NAN;
+        };
+
+        // Retrieve x and y data.
+        let msg = format!(
+            "File {} needs at least two columns to determine local minimum",
+            self.file_name()
+        );
+
+        // TODO: in the end we want to have the columns to be selectable.
+        let Some(xs) = data.columns.get(0) else {
+            log::error!("{msg}");
+            return f64::NAN;
+        };
+        let Some(ys) = data.columns.get(1) else {
+            log::error!("{msg}");
+            return f64::NAN;
+        };
+
+        // Make sure left and right are sorted correctly.
+        let (left, right) = (left.min(right), right.max(left));
+
+        // Return minimum
+        let mut minimum = xs
+            .iter()
+            .zip(ys)
+            // Filter out y-values for which x is within left and right bound.
+            .filter_map(|(x, y)| {
+                if *x < left || *x > right {
+                    None
+                } else {
+                    Some(y)
+                }
+            })
+            // Reduce to minimum y-value.
+            .reduce(|a, b| if a < b { a } else { b })
+            .unwrap_or(&f64::NAN)
+            .to_owned();
+
+        dbg!(minimum);
+
+        if after_scaling {
+            minimum *= self.properties.yscale
+        }
+        minimum
     }
 }
 
@@ -76,7 +185,7 @@ impl FileHandler {
                     fid,
                     File {
                         path: search_path.join(fp),
-                        csv_data,
+                        data: csv_data,
                         properties: super::FileProperties::default(),
                     },
                 );
@@ -193,7 +302,7 @@ impl FileHandler {
 
     pub fn try_update(&mut self) {
         for file in self.registry.values_mut() {
-            file.csv_data.try_update();
+            file.data.try_update();
         }
     }
 }
@@ -216,4 +325,133 @@ pub fn parse_csv(
         .send(Box::new(linker))
         .expect(BACKEND_HUNG_UP_MSG);
     rx
+}
+
+// ----------------------------------------------------------------------------
+//
+//
+// Integration Utilities
+//
+//
+// ----------------------------------------------------------------------------
+
+/// Trapezoidal integration.
+///
+/// Local baseline subtracts a linear baseline ranging from the start (left) to
+/// the end (right) point of the integration window.
+pub fn trapz(
+    x: &[f64],
+    y: &[f64],
+    left: f64,
+    right: f64,
+    local_baseline: bool,
+) -> Result<f64, String> {
+    let (mut left, right) = (left.min(right), left.max(right));
+
+    let n = x.len().min(y.len());
+    if n <= 1 {
+        return Err("Not enough values to integrate".into());
+    }
+    if x[0] >= right || x[n - 1] <= left {
+        return Err("Integration window out of bounds".into());
+    }
+
+    let mut area: f64;
+    // subtract local linear baseline, defined by start and end-point of integration window
+    if local_baseline {
+        let xs = vec![left, right];
+        let ys = linear_resample_array(&x, &y, &xs);
+        if ys.iter().any(|y| (*y).is_nan()) {
+            return Err("Integration window out of bounds.".into());
+        }
+        area = -singletrapz(left, right, ys[0], ys[1])
+    } else {
+        area = 0.0_f64;
+    }
+
+    let mut inside_integration_window = false;
+    let mut lastiter = false;
+    let mut j = 2;
+
+    while j <= n {
+        let mut x0 = x[j - 1];
+        let mut x1 = x[j];
+        let mut y0 = y[j - 1];
+        let mut y1 = y[j];
+
+        if x1 <= left {
+            j += 1;
+            continue;
+        } else if !inside_integration_window {
+            // this will only run once, when we enter the integration window
+            // test whether x0 should be replaced by left
+            if x0 < left {
+                y0 = lininterp(left, x0, x1, y0, y1);
+                x0 = left;
+            } else {
+                // this case means that left <= x[0]
+                left = x0;
+            }
+            inside_integration_window = true;
+        }
+
+        // test whether x1 should be replaced by right
+        if x1 >= right {
+            // we move out of the integration window
+
+            if x1 != right {
+                y1 = lininterp(right, x0, x1, y0, y1)
+            };
+            x1 = right;
+            lastiter = true; // we shall break the loop after this iteration
+        }
+
+        area += singletrapz(x0, x1, y0, y1);
+
+        if lastiter {
+            break;
+        }
+
+        j += 1;
+    }
+    Ok(area)
+}
+
+pub fn linear_resample_array(xs: &[f64], ys: &[f64], grid: &[f64]) -> Vec<f64> {
+    let segments = xs
+        .iter()
+        .zip(ys.iter())
+        .zip(xs.iter().skip(1).zip(ys.iter().skip(1)))
+        .map(|((x0, y0), (x1, y1))| (*x0, *y0, *x1, *y1))
+        .collect::<Vec<_>>();
+
+    let mut yp = Vec::with_capacity(grid.len());
+
+    for xi in grid.iter() {
+        if let Some((x0, y0, x1, y1)) = segments.iter().find(|(x0, _, x1, _)| xi >= x0 && xi < x1) {
+            yp.push(lininterp(*xi, *x0, *x1, *y0, *y1));
+            continue;
+        }
+        // only applies if xi happens to be == the last value in xs
+        else if let Some((_, _, _, y1)) = segments.iter().last().filter(|(_, _, x1, _)| xi == x1)
+        {
+            yp.push(*y1);
+            continue;
+        }
+        // applies if xi does not lie within the range of xs
+        else {
+            yp.push(f64::NAN)
+        };
+    }
+    yp
+}
+
+/// Calculate area of single trapezoid.
+fn singletrapz(x0: f64, x1: f64, y0: f64, y1: f64) -> f64 {
+    0.5 * f64::abs(x1 - x0) * (y1 + y0)
+}
+
+/// Linearly interpolate y-value at position xp between two points (x0, y0) and (x1, y1).
+pub fn lininterp(xp: f64, x0: f64, x1: f64, y0: f64, y1: f64) -> f64 {
+    (y1 * (xp - x0) + y0 * (x1 - xp)) / (x1 - x0)
 }

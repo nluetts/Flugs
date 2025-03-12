@@ -191,7 +191,7 @@ impl FileHandler {
         ui.separator();
 
         // Display error if csv could not be parsed.
-        if let Err(error) = file.csv_data.value() {
+        if let Err(error) = file.data.value() {
             ui.label(error).highlight();
         };
 
@@ -256,7 +256,7 @@ impl FileHandler {
 
 fn file_name_layout(file: &mut File) -> Option<LayoutJob> {
     let file_label_txt = if let Some(name) = file.path.file_name().and_then(|name| name.to_str()) {
-        if file.csv_data.value().is_ok() {
+        if file.data.value().is_ok() {
             egui::text::LayoutJob::single_section(name.to_owned(), egui::TextFormat::default())
         } else {
             // Make file label red if parsin CSV data failed.

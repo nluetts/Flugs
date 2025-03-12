@@ -13,7 +13,7 @@ pub struct PlotCache {
 
 #[derive(Clone, Debug, Default)]
 pub struct PlotData {
-    columns: Vec<Vec<f64>>,
+    pub columns: Vec<Vec<f64>>,
     num_columns: usize,
     comments: String,
     cache: PlotCache,

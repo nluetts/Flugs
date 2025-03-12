@@ -15,13 +15,8 @@ pub struct Plotter {
     current_plot_bounds: [f64; 4],
     current_integral: Option<(f64, f64)>,
     integrate_with_local_baseline: bool,
+    auto_shift_after_scaling: bool,
     pub mode: PlotterMode,
-}
-
-#[derive(PartialEq)]
-pub enum PlotterMode {
-    Display,
-    Integrate,
 }
 
 impl Plotter {
@@ -34,6 +29,22 @@ impl Plotter {
             mode: PlotterMode::Display,
             // TODO: make this a global option
             integrate_with_local_baseline: true,
+            auto_shift_after_scaling: false,
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub enum PlotterMode {
+    Display,
+    Integrate,
+}
+
+impl PlotterMode {
+    pub fn next(&mut self) -> Self {
+        match self {
+            PlotterMode::Display => PlotterMode::Integrate,
+            PlotterMode::Integrate => PlotterMode::Display,
         }
     }
 }

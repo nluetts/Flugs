@@ -88,9 +88,13 @@ impl eframe::App for EguiApp {
             if i.key_pressed(egui::Key::F1) {
                 self.shortcuts_modal_open = !self.shortcuts_modal_open;
             }
-            // Circle main window.
+            // Circle main window view.
             if i.key_pressed(egui::Key::F3) {
                 self.ui_selection = self.ui_selection.next();
+            }
+            // Circle mode.
+            if i.key_pressed(egui::Key::F4) {
+                self.plotter.mode = self.plotter.mode.next();
             }
             // Quick save app state.
             if i.key_pressed(egui::Key::F6) {
@@ -237,10 +241,6 @@ impl EguiApp {
 
                 ui.toggle_value(&mut self.shortcuts_modal_open, "Help (F1)");
 
-                if let crate::app::PlotterMode::Integrate = self.plotter.mode {
-                    self.plotter.integrate_menu(&mut self.file_handler, ui);
-                }
-
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     egui::widgets::global_theme_preference_buttons(ui);
                 });
@@ -263,6 +263,8 @@ impl EguiApp {
                     ui.label("F1 = Show Keyboard Shortcuts");
                     ui.separator();
                     ui.label("F3 = Cycle View");
+                    ui.separator();
+                    ui.label("F4 = Cycle Mode");
                     ui.separator();
                     ui.label("F6 = Save App State");
                     ui.separator();

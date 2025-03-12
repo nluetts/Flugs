@@ -26,7 +26,7 @@ pub struct FileHandler {
 
 #[derive(Debug)]
 pub struct File {
-    csv_data: UIParameter<Result<PlotData, String>>,
+    pub data: UIParameter<Result<PlotData, String>>,
     pub path: PathBuf,
     pub properties: FileProperties,
 }
@@ -78,7 +78,7 @@ impl File {
         let mut csv_data = UIParameter::new(Err("Data no loaded".to_string()));
         csv_data.set_recv(parse_csv(&path, request_tx));
         File {
-            csv_data,
+            data: csv_data,
             path,
             properties,
         }

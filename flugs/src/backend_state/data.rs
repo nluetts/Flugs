@@ -70,6 +70,14 @@ impl PlotData {
     pub fn get_cache(&self) -> &PlotCache {
         &self.cache
     }
+
+    pub fn ymin(&self) -> Option<f64> {
+        // TODO: This has to be changed when columns are selectable.
+        self.columns
+            .get(1)
+            .and_then(|ys| ys.iter().reduce(|a, b| if a < b { a } else { b }))
+            .copied()
+    }
 }
 
 impl PlotCache {

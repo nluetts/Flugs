@@ -130,8 +130,6 @@ impl File {
             .unwrap_or(&f64::NAN)
             .to_owned();
 
-        dbg!(minimum);
-
         if after_scaling {
             minimum *= self.properties.yscale
         }

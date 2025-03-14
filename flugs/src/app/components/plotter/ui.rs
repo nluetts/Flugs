@@ -80,6 +80,7 @@ impl super::Plotter {
                     });
                 }
 
+                // Plot files of currently active groups.
                 for (_, grp) in file_handler
                     .groups
                     .iter_mut()
@@ -198,21 +199,35 @@ impl super::Plotter {
             if self.mode == super::PlotterMode::Integrate {
                 if let Some((xmin, xmax)) = self.current_integral {
                     let (xmin, xmax) = (xmin.min(xmax), xmin.max(xmax));
-                    plot_iu.line(
-                        egui_plot::Line::new(
-                            data.iter()
-                                .filter_map(|[x, y]| {
-                                    if x >= &xmin && x <= &xmax {
-                                        Some([*x, *y])
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect::<Vec<[f64; 2]>>(),
-                        )
-                        .color(egui::Color32::from_rgba_premultiplied(255, 255, 255, 100))
-                        .width(width)
-                        .id(egui_id),
+                    // Plot area under curve.
+                    let mut plot_data = data
+                        .iter()
+                        .filter_map(|[x, y]| {
+                            if x >= &xmin && x <= &xmax {
+                                Some([*x, *y])
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<[f64; 2]>>();
+                    // TODO: how to plot area under curve down to a local baseline.
+                    match (plot_data.first(), plot_data.last()) {
+                        (Some([x0, y0]), Some([x1, y1])) => {
+                            // Local baseline.
+                            let line_data: Vec<_> = plot_data
+                                .iter()
+                                .rev()
+                                .map(|[x, _]| [*x, (y1 * (x - x0) + y0 * (x1 - x)) / (x1 - x0)])
+                                .collect();
+                            plot_data.extend(line_data);
+                        }
+                        _ => {}
+                    }
+                    plot_iu.polygon(
+                        egui_plot::Polygon::new(plot_data)
+                            .fill_color(egui::Color32::from_rgba_premultiplied(255, 255, 255, 100))
+                            .width(width)
+                            .id(egui_id),
                     );
                 }
             }
@@ -262,6 +277,7 @@ impl super::Plotter {
             // UI to trigger scaling by integral.
             ui.heading("Scale by Integral");
 
+            // Button to scale all currently shown spectra on their integrals.
             let scale_all = ui
                 .button("All")
                 .on_hover_ui(|ui| {
@@ -307,7 +323,16 @@ impl super::Plotter {
                                 // Optionally shift curve to make all plots align automatically.
                                 if self.auto_shift_after_scaling {
                                     let offset = file.local_minimum(*a, *b, false);
-                                    file.properties.yoffset = offset;
+                                    // dbg!(offset);
+                                    let ymin = match file.data.value() {
+                                        Ok(data) => data.ymin().unwrap_or_default(),
+                                        Err(_) => 0.0,
+                                    };
+                                    // Because we add/subtract ymin from the
+                                    // data when plotting (see plot method), we
+                                    // have to incorporate it here as well.
+                                    file.properties.yoffset =
+                                        -(offset - ymin) * file.properties.yscale - ymin;
                                 }
                             }
                         });

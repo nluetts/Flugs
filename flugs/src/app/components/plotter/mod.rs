@@ -34,7 +34,7 @@ impl Plotter {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum PlotterMode {
     Display,
     Integrate,

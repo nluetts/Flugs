@@ -33,6 +33,27 @@ impl super::Plotter {
             })
             .legend(Legend::default())
             .show(ui, |plot_ui| {
+                // Context menu, based on current mode.
+                match self.mode {
+                    // In display mode, we show the file properties menu.
+                    super::PlotterMode::Display => {
+                        if let Some(file) = self
+                            .selected_fid
+                            .and_then(|fid| file_handler.registry.get_mut(&fid))
+                        {
+                            plot_ui
+                                .response()
+                                .context_menu(|ui| file.render_property_settings(ui));
+                        }
+                    }
+                    // In integrate mode, we show the integrate menu.
+                    super::PlotterMode::Integrate => {
+                        plot_ui
+                            .response()
+                            .context_menu(|ui| self.integrate_menu(file_handler, ui));
+                    }
+                }
+
                 // Plot integration region, if intgrate mode is active.
                 if let super::PlotterMode::Integrate = self.mode {
                     if let Some((xmin, xmax)) = self.current_integral {
@@ -42,16 +63,6 @@ impl super::Plotter {
                                 .color(egui::Color32::RED)
                                 .width(3.0),
                         );
-                    }
-
-                    // Context menu based on current mode.
-                    match self.mode {
-                        super::PlotterMode::Display => {}
-                        super::PlotterMode::Integrate => {
-                            plot_ui
-                                .response()
-                                .context_menu(|ui| self.integrate_menu(file_handler, ui));
-                        }
                     }
 
                     // Handle mouse clicks (draging integral area).
@@ -114,27 +125,31 @@ impl super::Plotter {
                     [xmin, xmax, ymin, ymax]
                 };
 
-                plot_ui.plot_bounds()
+                // We need to "exfiltrate" the corrent plot bounds
+                // and whether the plot was clicked from this closure.
+                (plot_ui.plot_bounds(), plot_ui.response().clicked())
             });
 
         // Get modifier input (we need this here already, to disallow the plot
         // to be panned).
         let modifiers = ctx.input(|i| [i.modifiers.alt, i.modifiers.ctrl, i.modifiers.shift]);
         let modifier_down = modifiers.iter().any(|x| *x);
-        let mouse_pressed = ctx.input(|i| i.pointer.primary_pressed());
+        let plot_clicked = response.inner.1;
 
         if let Some(hovered_fid) = response
             .hovered_plot_item
             .and_then(|id| self.files_plot_ids.get(&id))
         {
             // Select file, if its plot was clicked this frame.
-            if mouse_pressed {
+            if plot_clicked {
                 self.selected_fid = Some(*hovered_fid);
             }
         } else {
+            // FIXME: The context menu for file property settings disappears due to this
+            // when user tries to click the UI elements
             // If we clicked somewhere and no modifier was pressed, we deselect
             // the currently selected file.
-            if mouse_pressed && !modifier_down {
+            if plot_clicked && !modifier_down {
                 self.selected_fid = None;
             }
         }
@@ -143,7 +158,7 @@ impl super::Plotter {
             .and_then(|fid| file_handler.registry.get_mut(&fid))
         {
             // `yspan` is needed to determine speed of y-scaling.
-            let yspan = response.inner.height();
+            let yspan = response.inner.0.height();
             let should_modify = modifier_down && drag.length() > 0.0;
             if should_modify {
                 self.manipulate_file(selected_file, modifiers, drag, yspan);
@@ -223,9 +238,9 @@ impl super::Plotter {
                         }
                         _ => {}
                     }
-                    plot_iu.polygon(
-                        egui_plot::Polygon::new(plot_data)
-                            .fill_color(egui::Color32::from_rgba_premultiplied(255, 255, 255, 100))
+                    plot_iu.line(
+                        egui_plot::Line::new(plot_data)
+                            .color(egui::Color32::WHITE)
                             .width(width)
                             .id(egui_id),
                     );

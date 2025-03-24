@@ -1,5 +1,9 @@
 use app_core::string_error::ErrorStringExt;
-use std::{io::Read, path::PathBuf, str::FromStr};
+use std::{
+    io::{Read, Write},
+    path::PathBuf,
+    str::FromStr,
+};
 
 #[derive(Debug)]
 pub struct Config {
@@ -24,6 +28,35 @@ impl Default for Config {
             svg_height,
             x_label,
             y_label,
+        }
+    }
+}
+
+impl Config {
+    pub fn render(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
+        ui.heading("Preferences");
+        ui.separator();
+
+        ui.label("Search Path");
+        let mut path = self.search_path.to_string_lossy();
+        ui.text_edit_singleline(&mut path);
+        self.search_path = path.to_string().into();
+
+        ui.label("Width of exported SVG");
+        ui.add(egui::DragValue::new(&mut self.svg_width).speed(10));
+        ui.label("Height of exported SVG");
+        ui.add(egui::DragValue::new(&mut self.svg_height).speed(10));
+        ui.label("X-Label");
+        ui.text_edit_singleline(&mut self.x_label);
+        ui.label("Y-Label");
+        ui.text_edit_singleline(&mut self.y_label);
+
+        ui.separator();
+
+        if ui.button("Save to Config File").clicked() {
+            if let Err(e) = self.to_config_file() {
+                log::error!("{e}");
+            };
         }
     }
 }
@@ -81,6 +114,44 @@ impl Config {
             }
         }
         Ok(config)
+    }
+
+    fn to_config_file(&self) -> Result<(), String> {
+        #[allow(deprecated)]
+        let Some(config_file_path) =
+            std::env::home_dir().map(|path| path.join(PathBuf::from(".flugs")))
+        else {
+            return Err("could open config file".into());
+        };
+
+        log::info!("attempting to save config to {config_file_path:?}");
+
+        let mut config_file = match std::fs::File::create(config_file_path) {
+            Ok(file) => file,
+            Err(err) => return Err(format!("could not open config file: {err}")),
+        };
+
+        let mut wrt_results = Vec::with_capacity(10);
+
+        wrt_results.push(config_file.write_all(
+            &format!("search_path={}\n", self.search_path.to_string_lossy()).into_bytes(),
+        ));
+        wrt_results
+            .push(config_file.write_all(&format!("svg_width={}\n", self.svg_width).into_bytes()));
+        wrt_results
+            .push(config_file.write_all(&format!("svg_height={}\n", self.svg_height).into_bytes()));
+        wrt_results
+            .push(config_file.write_all(&format!("x_label={}\n", self.x_label).into_bytes()));
+        wrt_results
+            .push(config_file.write_all(&format!("y_label={}\n", self.y_label).into_bytes()));
+
+        for res in wrt_results {
+            if let Err(e) = res {
+                return Err(format!("could not write to config file: {e}"));
+            }
+        }
+
+        Ok(())
     }
 }
 

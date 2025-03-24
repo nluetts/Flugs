@@ -159,7 +159,7 @@ impl FileHandler {
             }
         });
     }
-    fn file_settings(
+    pub fn file_settings(
         &mut self,
         fid: FileID,
         gid: usize,
@@ -195,26 +195,7 @@ impl FileHandler {
             ui.label(error).highlight();
         };
 
-        ui.horizontal(|ui| {
-            let label = ui.label("Alias: ");
-            ui.text_edit_singleline(&mut file.properties.alias)
-                .labelled_by(label.id);
-        });
-
-        ui.label("X-Offset: ");
-        let dragv = egui::DragValue::new(&mut file.properties.xoffset);
-        ui.add(dragv);
-        ui.label("Y-Offset: ");
-        let dragv = egui::DragValue::new(&mut file.properties.yoffset);
-        ui.add(dragv);
-        ui.label("Y-Scale: ");
-        let dragv = egui::DragValue::new(&mut file.properties.yscale);
-        ui.add(dragv);
-
-        ui.label("Comment:");
-        egui::TextEdit::multiline(&mut file.properties.comment)
-            .hint_text("Type a comment.")
-            .show(ui);
+        file.render_property_settings(ui);
 
         ui.separator();
 
@@ -251,6 +232,31 @@ impl FileHandler {
             }
             (None, _) => (),
         }
+    }
+}
+
+impl File {
+    pub fn render_property_settings(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            let label = ui.label("Alias: ");
+            ui.text_edit_singleline(&mut self.properties.alias)
+                .labelled_by(label.id);
+        });
+
+        ui.label("X-Offset: ");
+        let dragv = egui::DragValue::new(&mut self.properties.xoffset);
+        ui.add(dragv);
+        ui.label("Y-Offset: ");
+        let dragv = egui::DragValue::new(&mut self.properties.yoffset);
+        ui.add(dragv);
+        ui.label("Y-Scale: ");
+        let dragv = egui::DragValue::new(&mut self.properties.yscale);
+        ui.add(dragv);
+
+        ui.label("Comment:");
+        egui::TextEdit::multiline(&mut self.properties.comment)
+            .hint_text("Type a comment.")
+            .show(ui);
     }
 }
 

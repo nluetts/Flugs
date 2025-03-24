@@ -34,6 +34,7 @@ pub struct EguiApp {
 enum UISelection {
     Plot,
     FileSettings,
+    Preferences,
 }
 
 impl UISelection {
@@ -41,6 +42,7 @@ impl UISelection {
         match self {
             UISelection::Plot => Self::FileSettings,
             UISelection::FileSettings => Self::Plot,
+            UISelection::Preferences => Self::Plot,
         }
     }
 }
@@ -114,6 +116,10 @@ impl eframe::App for EguiApp {
                 // but not the backend thread.
                 should_quit = true;
             }
+            // Open preferences.
+            if i.key_pressed(egui::Key::F12) {
+                self.ui_selection = UISelection::Preferences;
+            }
             if i.key_pressed(egui::Key::S) && i.modifiers.ctrl {
                 log::debug!("open dialog to select save path");
                 let handle = std::thread::spawn(|| rfd::FileDialog::new().save_file());
@@ -170,6 +176,9 @@ impl EguiApp {
                 self.file_handler
                     .render(&mut self.request_tx, &mut self.event_queue, ui, ctx)
             }
+            U::Preferences => {
+                self.config.render(ctx, ui);
+            }
         }
     }
 
@@ -202,6 +211,9 @@ impl EguiApp {
                             log::error!("{}", error)
                         };
                     }
+                    if ui.button("Preferences").clicked() {
+                        self.ui_selection = UISelection::Preferences
+                    };
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
@@ -271,6 +283,8 @@ impl EguiApp {
                     ui.label("F5 = Load App State");
                     ui.separator();
                     ui.label("F10 = Quit App");
+                    ui.separator();
+                    ui.label("F12 = Open Preferences");
                     ui.separator();
                 })
                 .should_close()

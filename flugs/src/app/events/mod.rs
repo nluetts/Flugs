@@ -42,6 +42,11 @@ impl<EguiApp> EventQueue<EguiApp> {
     pub fn queue_event(&mut self, event: Box<dyn AppEvent<App = EguiApp>>) {
         self.queue.push(event);
     }
+
+    pub fn discard_events(&mut self) {
+        self.queue.drain(..);
+        self.tmp_backlog.drain(..);
+    }
 }
 
 impl EguiApp {

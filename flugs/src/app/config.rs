@@ -163,6 +163,6 @@ mod tests {
     fn test_from_config_file() {
         #[allow(unused)]
         let res = Config::from_config_file();
-        dbg!(res);
+        // dbg!(res);
     }
 }

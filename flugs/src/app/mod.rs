@@ -70,6 +70,11 @@ impl EguiApp {
         }
     }
 
+    fn reset_state(&mut self) {
+        self.file_handler = Default::default();
+        self.event_queue.discard_events();
+    }
+
     fn update_state(&mut self) {
         self.run_events();
         self.file_handler.try_update();
@@ -213,6 +218,9 @@ impl EguiApp {
                     }
                     if ui.button("Preferences").clicked() {
                         self.ui_selection = UISelection::Preferences
+                    };
+                    if ui.button("Reset Session").clicked() {
+                        self.reset_state();
                     };
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);

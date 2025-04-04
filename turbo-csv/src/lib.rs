@@ -52,9 +52,11 @@ impl Parser {
         let mut comments: Vec<&str> = Vec::new();
 
         // These variables are used to keep track of the state of the parser.
-        let mut delimiter: Option<Token<'_>> = None;
+        let mut first_encountered_delimiter: Option<Token<'_>> = None;
+        let mut prev_token = Token::Newline;
         let mut max_column_idx = 0;
         let mut current_column_idx = 0;
+        let mut line_no = 1;
 
         // For each line, we collect numbers in a this hashmap which maps from
         // column index to number. This way, we can fill missing entries in
@@ -72,53 +74,50 @@ impl Parser {
             }
             match tok {
                 Token::Integer(x) => {
+                    if let Token::Delimiter(_) = prev_token {
+                        current_column_idx += 1;
+                    }
                     current_row.insert(current_column_idx, x as f64);
                 }
                 Token::Float(x) => {
-                    current_row.insert(current_column_idx, x);
-                }
-                Token::Delimiter(c) => match delimiter {
-                    Some(Token::Delimiter(ld)) => {
-                        // If we already saw this delimiter, we assume a new
-                        // column starts here, if the delimiter is not a space.
-                        if ld == c {
-                            // Whitespace has to be treated with special care, since we
-                            // may need to collapse repeated delimiters.
-                            if c != ' ' {
-                                current_column_idx += 1;
-                            } else if c == ' '
-                                // If the current delimiter is a space, we only
-                                // bump the column index if the next token is
-                                // _not_ a delimiting space.
-                                && !tokens
-                                    .peek()
-                                    .is_some_and(|tok| tok == &Token::Delimiter(' '))
-                            {
-                                current_column_idx += 1;
-                            }
-                        } else {
-                            // If we already saw a delimiter and the current one
-                            // is different, we reject the current line.
-                            log::warn!("mixed delimiters found, skipping line");
-                            loop {
-                                match tokens.next() {
-                                    Some(Token::Newline) | None => {
-                                        line_valid = false;
-                                        break;
-                                    }
-                                    Some(_) => {}
-                                }
-                            }
-                            current_column_idx = 0;
-                            current_row.clear();
-                        }
-                    }
-                    None => {
-                        delimiter = Some(Token::Delimiter(c));
+                    if let Token::Delimiter(_) = prev_token {
                         current_column_idx += 1;
                     }
-                    Some(_) => unreachable!(),
-                },
+                    current_row.insert(current_column_idx, x);
+                }
+                Token::Delimiter(delim) => {
+                    if first_encountered_delimiter.is_none() && delim != ' ' && delim != '\t' {
+                        first_encountered_delimiter = Some(Token::Delimiter(delim));
+                    }
+                    match prev_token {
+                        Token::Delimiter(prev_delim) => {
+                            match (prev_delim, delim) {
+                                (' ', ',') => current_column_idx += 1,
+                                (' ', ';') => current_column_idx += 1,
+                                (',', ',') => current_column_idx += 1,
+                                (';', ';') => current_column_idx += 1,
+                                (',', ';') => {
+                                    log::warn!("ignoring line {} with mixed delimiters", line_no);
+                                    while tokens
+                                        .peek()
+                                        .map(|tok| tok != &Token::Newline)
+                                        .unwrap_or_default()
+                                    {
+                                        tokens.next();
+                                    }
+                                }
+                                (';', ',') => current_column_idx += 1,
+                                (' ', ' ') => continue, // Ignore repeated white space.
+                                _ => unreachable!(),
+                            }
+                        }
+                        Token::Newline => match delim {
+                            ',' | ';' => current_column_idx += 1,
+                            _ => {}
+                        },
+                        _ => current_column_idx += 1,
+                    }
+                }
                 Token::Comment(c) => comments.push(c),
                 Token::Newline => {
                     if !current_row.is_empty() && line_valid {
@@ -136,9 +135,11 @@ impl Parser {
                     }
                     current_column_idx = 0;
                     current_row.clear();
+                    line_no += 1;
                     line_valid = true;
                 }
             }
+            prev_token = tok;
         }
         let comments = comments.join("\n");
         (comments, data)

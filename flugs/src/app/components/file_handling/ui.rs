@@ -199,6 +199,24 @@ impl FileHandler {
 
         ui.separator();
 
+        egui::CollapsingHeader::new("Contents").show(ui, |ui| {
+            egui::ScrollArea::new([true, false]).show(ui, |ui| {
+                let mut contents = String::with_capacity(10_000);
+                let Ok(data) = file.data.value() else { return };
+                let Some(xs) = data.columns.get(0) else {
+                    return;
+                };
+                let Some(ys) = data.columns.get(0) else {
+                    return;
+                };
+                for (x, y) in xs.iter().zip(ys) {
+                    let _ = writeln!(contents, "{x}, {y}");
+                }
+
+                ui.label(contents);
+            })
+        });
+
         // Menu to move/copy file to other group.
         let mut target: (Option<usize>, bool) = (None, false);
         egui::ComboBox::new((fid, "move"), "Move to Group").show_ui(ui, |ui| {

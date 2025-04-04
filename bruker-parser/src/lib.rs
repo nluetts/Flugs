@@ -211,7 +211,7 @@ impl BlockDefinition {
                     param_bytes[7],
                 ])),
 
-                2 | 3 | 4 => O::Text(
+                2..=4 => O::Text(
                     param_bytes
                         .iter()
                         .filter(|&&b| b != 0)
@@ -242,7 +242,7 @@ fn read_block_definitions(buf: &[u8; HEADER_SIZE_BYTES]) -> Vec<BlockDefinition>
     let mut blks = Vec::new();
     let mut cursor = INITIAL_CURSOR_POS;
     while cursor < (HEADER_SIZE_BYTES - META_BLOCK_SIZE) {
-        let blk = BlockDefinition::from_buffer(&buf, cursor);
+        let blk = BlockDefinition::from_buffer(buf, cursor);
 
         if blk.offset == 0 {
             break;
@@ -344,7 +344,7 @@ impl OpusAbsorbanceData {
         let mut output_buf = String::with_capacity(self.absorbance.len() * 40);
 
         for (x, y) in self.wavenumber.iter().zip(self.absorbance.iter()) {
-            write!(output_buf, "{},{}\n", x, y);
+            writeln!(output_buf, "{},{}", x, y);
         }
 
         let mut file = File::create(path).err_to_string("could not create file to save to csv")?;

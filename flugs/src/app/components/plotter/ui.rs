@@ -68,24 +68,20 @@ impl super::Plotter {
                     // Handle mouse clicks (draging integral area).
                     //
                     // Reading this before the if statement is required to avoid a dead lock.
-                    let inside_plot = pointer_inside_plot(&plot_ui);
+                    let inside_plot = pointer_inside_plot(plot_ui);
                     plot_ui.ctx().input(|i| {
                         if i.pointer.button_down(egui::PointerButton::Primary)
                             && plot_ui.response().contains_pointer()
                             && inside_plot
                         {
-                            match (i.pointer.press_origin(), i.pointer.latest_pos()) {
-                                (Some(origin), Some(current_position)) => {
-                                    // Pointer positions are in screen coordinates and must be translated into
-                                    // the coordinate system of the plot.
-                                    let origin =
-                                        plot_ui.transform().value_from_position(origin).x as f64;
-                                    let current_position =
-                                        plot_ui.transform().value_from_position(current_position).x
-                                            as f64;
-                                    self.current_integral = Some((origin, current_position))
-                                }
-                                _ => {}
+                            if let (Some(origin), Some(current_position)) = (i.pointer.press_origin(), i.pointer.latest_pos()) {
+                                // Pointer positions are in screen coordinates and must be translated into
+                                // the coordinate system of the plot.
+                                let origin =
+                                    plot_ui.transform().value_from_position(origin).x;
+                                let current_position =
+                                    plot_ui.transform().value_from_position(current_position).x;
+                                self.current_integral = Some((origin, current_position))
                             }
                         }
                     });
@@ -226,17 +222,14 @@ impl super::Plotter {
                         })
                         .collect::<Vec<[f64; 2]>>();
                     // TODO: how to plot area under curve down to a local baseline.
-                    match (plot_data.first(), plot_data.last()) {
-                        (Some([x0, y0]), Some([x1, y1])) => {
-                            // Local baseline.
-                            let line_data: Vec<_> = plot_data
-                                .iter()
-                                .rev()
-                                .map(|[x, _]| [*x, (y1 * (x - x0) + y0 * (x1 - x)) / (x1 - x0)])
-                                .collect();
-                            plot_data.extend(line_data);
-                        }
-                        _ => {}
+                    if let (Some([x0, y0]), Some([x1, y1])) = (plot_data.first(), plot_data.last()) {
+                        // Local baseline.
+                        let line_data: Vec<_> = plot_data
+                            .iter()
+                            .rev()
+                            .map(|[x, _]| [*x, (y1 * (x - x0) + y0 * (x1 - x)) / (x1 - x0)])
+                            .collect();
+                        plot_data.extend(line_data);
                     }
                     plot_iu.line(
                         egui_plot::Line::new(plot_data)
@@ -354,10 +347,8 @@ impl super::Plotter {
                     }
                 }
             }
-        } else {
-            if ui.button("New Region").clicked() {
-                self.current_integral = Some((0.0, 0.0));
-            }
+        } else if ui.button("New Region").clicked() {
+            self.current_integral = Some((0.0, 0.0));
         }
     }
 }
@@ -380,5 +371,5 @@ fn pointer_inside_plot(plot_ui: &egui_plot::PlotUi) -> bool {
                 .range_y()
                 .contains(&pointer_position.y);
     }
-    return false;
+    false
 }

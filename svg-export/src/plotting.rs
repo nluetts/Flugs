@@ -61,7 +61,7 @@ impl Figure {
     pub fn render(&self) -> String {
         let mut root = Tag::<svg::SVG>::new(self.width, self.height, None);
         for ax in self.axes.iter() {
-            let ax_tags = ax.to_tags(&self);
+            let ax_tags = ax.to_tags(self);
             root.add_children(ax_tags);
         }
         crate::svg::render(&root)
@@ -300,7 +300,7 @@ impl Axis {
                     .flat_map(|lab| lab.to_tags(self, fig)),
             );
         }
-        children.extend(self.ticks.to_tags(&self, fig));
+        children.extend(self.ticks.to_tags(self, fig));
         let mut ax_rect = Tag::<svg::Rect>::new(
             w * self.u,
             h * self.v,

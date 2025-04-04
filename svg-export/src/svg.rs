@@ -54,7 +54,7 @@ where
 
 impl RenderTag for String {
     fn render(&self, buf: &mut String) {
-        buf.push_str(&self);
+        buf.push_str(self);
     }
 }
 
@@ -111,7 +111,7 @@ impl Tag<SVG> {
 
         Self {
             parameters,
-            style: style.unwrap_or(Params::new()),
+            style: style.unwrap_or_default(),
             children,
             closing: true,
             kind: SVG {},
@@ -133,7 +133,7 @@ impl Tag<Circle> {
 
         Self {
             parameters,
-            style: style.unwrap_or(Params::new()),
+            style: style.unwrap_or_default(),
             children,
             closing: false,
             kind: Circle {},
@@ -156,7 +156,7 @@ impl Tag<Rect> {
 
         Self {
             parameters,
-            style: style.unwrap_or(Params::new()),
+            style: style.unwrap_or_default(),
             children,
             closing: false,
             kind: Rect {},
@@ -174,7 +174,7 @@ impl Tag<Text> {
 
         let mut res = Self {
             parameters,
-            style: style.unwrap_or(Params::new()),
+            style: style.unwrap_or_default(),
             children,
             closing: true,
             kind: Text {},
@@ -193,7 +193,7 @@ impl Tag<Line> {
             ("x2", format!("{x2}")),
             ("y1", format!("{y1}")),
             ("y2", format!("{y2}")),
-            ("stroke", format!("black")),
+            ("stroke", "black".to_string()),
         ]
         .into_iter()
         .map(|(k, v)| (k.to_string(), v))
@@ -201,7 +201,7 @@ impl Tag<Line> {
 
         Self {
             parameters,
-            style: style.unwrap_or(Params::new()),
+            style: style.unwrap_or_default(),
             children,
             closing: false,
             kind: Line {},
@@ -226,7 +226,7 @@ impl Tag<Polyline> {
 
         Self {
             parameters,
-            style: style.unwrap_or(Params::new()),
+            style: style.unwrap_or_default(),
             children,
             closing: false,
             kind: Polyline {},

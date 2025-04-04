@@ -49,7 +49,7 @@ impl File {
         );
 
         // TODO: in the end we want to have the columns to be selectable.
-        let Some(xs) = data.columns.get(0) else {
+        let Some(xs) = data.columns.first() else {
             log::error!("{msg}");
             return f64::NAN;
         };
@@ -73,15 +73,15 @@ impl File {
             );
 
         // Apply trapezoidal integration.
-        let area = match trapz(&xs, &ys, left, right, local_baseline) {
+        
+
+        match trapz(&xs, &ys, left, right, local_baseline) {
             Ok(area) => area,
             Err(err) => {
                 log::error!("Failed to integrate file {}: {err}", self.file_name());
-                return f64::NAN;
+                f64::NAN
             }
-        };
-
-        area
+        }
     }
 
     pub fn local_minimum(&mut self, left: f64, right: f64, after_scaling: bool) -> f64 {
@@ -101,7 +101,7 @@ impl File {
         );
 
         // TODO: in the end we want to have the columns to be selectable.
-        let Some(xs) = data.columns.get(0) else {
+        let Some(xs) = data.columns.first() else {
             log::error!("{msg}");
             return f64::NAN;
         };
@@ -358,7 +358,7 @@ pub fn trapz(
     // subtract local linear baseline, defined by start and end-point of integration window
     if local_baseline {
         let xs = vec![left, right];
-        let ys = linear_resample_array(&x, &y, &xs);
+        let ys = linear_resample_array(x, y, &xs);
         if ys.iter().any(|y| (*y).is_nan()) {
             return Err("Integration window out of bounds.".into());
         }

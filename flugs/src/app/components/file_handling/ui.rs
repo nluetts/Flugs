@@ -203,10 +203,10 @@ impl FileHandler {
             egui::ScrollArea::new([true, false]).show(ui, |ui| {
                 let mut contents = String::with_capacity(10_000);
                 let Ok(data) = file.data.value() else { return };
-                let Some(xs) = data.columns.get(0) else {
+                let Some(xs) = data.columns.first() else {
                     return;
                 };
-                let Some(ys) = data.columns.get(0) else {
+                let Some(ys) = data.columns.first() else {
                     return;
                 };
                 for (x, y) in xs.iter().zip(ys) {

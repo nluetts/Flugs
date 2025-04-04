@@ -12,7 +12,7 @@ pub const BACKEND_HUNG_UP_MSG: &str = "backend thread hung up unexpectedly";
 mod tests {
     use std::time::Instant;
 
-    use env_logger;
+    
     use log::trace;
 
     use crate::backend::{request_stop, BackendEventLoop, BackendLink, BackendState};

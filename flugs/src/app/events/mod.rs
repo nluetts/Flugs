@@ -229,7 +229,7 @@ impl AppEvent for SavePlotRequested {
         if let Some(handle) = self.thread_handle.take_if(|handle| handle.is_finished()) {
             match handle.join() {
                 Ok(Some(path)) => {
-                    super::components::save_svg(&app, &path);
+                    super::components::save_svg(app, &path);
                 }
                 Ok(None) => (),
                 Err(err) => {

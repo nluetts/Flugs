@@ -74,10 +74,7 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
                 app.file_handler
                     .registry
                     .get(fid)
-                    .and_then(|file| match file.get_cache() {
-                        Some(cache) => Some((cache, file)),
-                        None => None,
-                    })
+                    .and_then(|file| file.get_cache().map(|cache| (cache, file)))
             {
                 // Color for current file.
                 let color: String = {

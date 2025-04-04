@@ -143,7 +143,7 @@ impl super::Search {
             log::debug!("added {} paths to load", number_added);
             return true;
         };
-        return false;
+        false
     }
 
     fn matches_ui(&mut self, ui: &mut egui::Ui, phrase_input: egui::Response, ctx: &egui::Context) {
@@ -241,7 +241,7 @@ fn match_hover_ui(
             ui.label(txt);
             *cursor = egui::CursorIcon::NotAllowed;
         }
-        super::ParsedData::None => match PlotData::from_path(&search_path.value().join(&fp)) {
+        super::ParsedData::None => match PlotData::from_path(&search_path.value().join(fp)) {
             Ok(data) => *csv_data = super::ParsedData::Ok(data),
             Err(err) => *csv_data = super::ParsedData::Failed(err.to_string()),
         },

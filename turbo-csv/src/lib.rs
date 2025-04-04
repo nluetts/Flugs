@@ -4,6 +4,8 @@ use std::{collections::HashMap, path::Path};
 
 pub struct Parser {
     lexer: Lexer,
+    /// Used to check repeated delimiters
+    delimiter_buffer: String,
 }
 
 struct Lexer {
@@ -36,6 +38,7 @@ impl Parser {
     pub fn from_path(path: &Path) -> Result<Self, std::io::Error> {
         Ok(Self {
             lexer: Lexer::from_path(path)?,
+            delimiter_buffer: String::with_capacity(10),
         })
     }
 
@@ -43,6 +46,7 @@ impl Parser {
     fn from_string(raw_input: String) -> Self {
         Self {
             lexer: Lexer::from_string(raw_input),
+            delimiter_buffer: String::with_capacity(10),
         }
     }
 
@@ -52,7 +56,6 @@ impl Parser {
         let mut comments: Vec<&str> = Vec::new();
 
         // These variables are used to keep track of the state of the parser.
-        let mut first_encountered_delimiter: Option<Token<'_>> = None;
         let mut prev_token = Token::Newline;
         let mut max_column_idx = 0;
         let mut current_column_idx = 0;
@@ -74,48 +77,60 @@ impl Parser {
             }
             match tok {
                 Token::Integer(x) => {
-                    if let Token::Delimiter(_) = prev_token {
-                        current_column_idx += 1;
-                    }
                     current_row.insert(current_column_idx, x as f64);
                 }
                 Token::Float(x) => {
-                    if let Token::Delimiter(_) = prev_token {
-                        current_column_idx += 1;
-                    }
                     current_row.insert(current_column_idx, x);
                 }
                 Token::Delimiter(delim) => {
-                    if first_encountered_delimiter.is_none() && delim != ' ' && delim != '\t' {
-                        first_encountered_delimiter = Some(Token::Delimiter(delim));
-                    }
                     match prev_token {
                         Token::Delimiter(prev_delim) => {
                             match (prev_delim, delim) {
                                 (' ', ',') => current_column_idx += 1,
                                 (' ', ';') => current_column_idx += 1,
+                                ('\t', ',') => current_column_idx += 1,
+                                ('\t', ';') => current_column_idx += 1,
                                 (',', ',') => current_column_idx += 1,
                                 (';', ';') => current_column_idx += 1,
                                 (',', ';') => {
                                     log::warn!("ignoring line {} with mixed delimiters", line_no);
-                                    while tokens
-                                        .peek()
-                                        .map(|tok| tok != &Token::Newline)
-                                        .unwrap_or_default()
-                                    {
-                                        tokens.next();
-                                    }
+                                    skip_to_next_row(&mut tokens);
                                 }
-                                (';', ',') => current_column_idx += 1,
+                                (';', ',') => {
+                                    log::warn!("ignoring line {} with mixed delimiters", line_no);
+                                    skip_to_next_row(&mut tokens);
+                                }
                                 (' ', ' ') => continue, // Ignore repeated white space.
+                                ('\t', ' ') => continue, // Ignore repeated white space.
+                                (' ', '\t') => continue, // Ignore repeated white space.
+                                ('\t', '\t') => continue, // Ignore repeated white space.
                                 _ => unreachable!(),
                             }
                         }
                         Token::Newline => match delim {
                             ',' | ';' => current_column_idx += 1,
-                            _ => {}
+                            _ => continue,
                         },
-                        _ => current_column_idx += 1,
+                        _ => {
+                            // Current token is a "," or ";" delimter and the previous
+                            // token is not a newline or a delimiter: increase colum index.
+                            if delim == ',' || delim == ';' {
+                                current_column_idx += 1;
+                            // The current token is a white space delimiter but the previous
+                            // token is not a newline or delimiter: check next character:
+                            } else {
+                                match tokens.peek() {
+                                    // Fall through if next token is delimiter.
+                                    Some(Token::Delimiter(_)) => {}
+                                    // Ignore trailing white space.
+                                    Some(Token::Newline) | None => continue,
+                                    // Increase current column count for all
+                                    // other tokens (this means two numeric
+                                    // tokens are separated by whitespace).
+                                    _ => current_column_idx += 1,
+                                }
+                            }
+                        }
                     }
                 }
                 Token::Comment(c) => comments.push(c),
@@ -617,5 +632,15 @@ mod test {
         let (comment, result) = parser.parse_as_floats();
         println!("{}", comment);
         assert_eq!(result, expected);
+    }
+}
+
+fn skip_to_next_row(tokens: &mut std::iter::Peekable<std::vec::IntoIter<Token<'_>>>) {
+    while tokens
+        .peek()
+        .map(|tok| tok != &Token::Newline)
+        .unwrap_or_default()
+    {
+        tokens.next();
     }
 }

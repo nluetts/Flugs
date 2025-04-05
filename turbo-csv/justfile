@@ -1,4 +1,4 @@
 default:
-    RUST_LOG=debug cargo test --lib test_parse_float -- --nocapture
+    RUST_LOG=debug cargo test --lib test_watercluster_paper_file -- --nocapture
 test:
     RUST_LOG=turbo_csv::test=debug cargo test --lib -- --nocapture

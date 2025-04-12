@@ -1,7 +1,7 @@
 UI:
 - [x] ~~Implement plotting/hiding of groups accessible with switch
       buttons on plotting UI~~
-- [.] Include legend
+- [x] Include legend
   - [x] ~~Showing filename~~
   - [x] ~~Showing alias~~
 - [x] ~~Select good colors for plots based on FileID~~
@@ -12,10 +12,11 @@ UI:
   - [x] ~~Implement scaling/shifting of plots (form based and mouse control)~~
   - [ ] Implement plotting of columns different than first two
     - [ ] Allow plotting more than one dataset from CSV file
-- [ ] Create Global Settings View
+- [x] Create Global Settings View
 - [ ] Include error log window 
 - [ ] Files in file settings view should have a fixed order
-- [ ] Allow to attach meta data to files
+- [.] Allow to attach meta data to files
+  - [x] Add arbitrary comments
 - [x] ~~Allow saving/loading to/from arbitrary path~~
 
 - [x] ~~Allow moving files between groups~~
@@ -26,13 +27,15 @@ Search:
 
 Plotter:
 - [ ] Have a flag to disable/enable the legend
+- [ ] Allow custom x/y tick positions when exporting
+- [ ] Allow custom color for each plot
 
 Internals:
 - [x] ~~Use array of length 10 for groups instead of hashmap~~
 - [x] ~~Handle UI interactions using an event system?~~
 - [x] Remove hard coded paths
   - [.] Work with configuration file
-- [ ] CSV with repeated delimiter (whitespace) should parse correctly
+- [x] CSV with repeated delimiter (whitespace) should parse correctly
 - [.] Parse Bruker files
   - Fails for some files, needs debugging
 

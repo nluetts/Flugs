@@ -306,7 +306,7 @@ impl OpusAbsorbanceData {
             return Err("file does not contain absorbance or single channel data".to_string());
         };
 
-        let data = data_definition
+        let data: Vec<_> = data_definition
             .read_block_data_from_file(&mut file)?
             .iter()
             .map(|x| *x as f64)
@@ -329,14 +329,18 @@ impl OpusAbsorbanceData {
         // Create the wavenumber data. Keep in mind that in Opus higher
         // wavenumber is left, lower wavenumber right.
         let mut x = xmax;
-        while x >= xmin {
+        for y in data.iter() {
+            // This effectively skips NaNs.
+            if y.is_finite() {
+                wavenumber.push(x);
+            }
             x -= step;
-            wavenumber.push(x);
         }
 
         Ok(OpusAbsorbanceData {
-            wavenumber,
-            absorbance: data,
+            // Reverse order to make x-axis ascending.
+            wavenumber: wavenumber.into_iter().rev().collect(),
+            absorbance: data.into_iter().rev().collect(),
         })
     }
 

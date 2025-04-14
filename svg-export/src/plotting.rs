@@ -406,9 +406,6 @@ impl Axis {
                 });
                 // If (i + 1)th datapoint is also within axis, we do not need to check
                 // for crossings ...
-                if outside(i + 1) {
-                    dbg!(xs[i], ys[i], xs[i + 1], ys[i + 1]);
-                }
                 if !outside(i + 1) {
                     // ... but we have to check if it is the last point, because then
                     // we have to add it to the current (and last) segment.

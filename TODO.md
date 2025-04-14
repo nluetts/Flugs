@@ -1,4 +1,8 @@
-UI:
+UI/UX:
+- [ ] Reload the last quicksave on startup
+- [ ] Warn when scaling on integral yields inf
+- [ ] It should not be possible to load the same spectrum twice (into the same group!)
+- [x] ~~Keyboard controls in search menu: arrow down should not go below number of search hits~~
 - [x] ~~Implement plotting/hiding of groups accessible with switch
       buttons on plotting UI~~
 - [x] Include legend
@@ -42,3 +46,4 @@ Internals:
 BUGS:
 - [x] ~~Removing one file from group may may delete all files~~
 - [x] ~~CSV parsing can panic~~
+- [x] ~~spectral integration currently not working with OPUS files, probably because of the inversed x-axis~~

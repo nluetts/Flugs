@@ -41,13 +41,14 @@ impl super::Search {
 
         // Handle arrow keys for selecting entries.
         ctx.input(|i| {
+            let n_matches = self.matches.value().len();
             if i.key_released(egui::Key::ArrowDown) {
                 self.mode = SearchMode::KeyboardSelection;
                 self.selected_match = match self.selected_match {
-                    Some(n) if n < 9 => Some(n + 1),
-                    Some(9) => Some(9),
+                    Some(n) if n < n_matches - 1 => Some(n + 1),
+                    Some(n) if n == n_matches - 1 => Some(n),
                     None => Some(0),
-                    _ => unreachable!(),
+                    _ => Some(n_matches - 1),
                 }
             };
             if i.key_released(egui::Key::ArrowUp) {
@@ -56,12 +57,11 @@ impl super::Search {
                         self.mode = SearchMode::KeyboardInput;
                         None
                     }
-                    Some(n) if n <= 9 => {
+                    Some(n) if n <= n_matches => {
                         self.mode = SearchMode::KeyboardSelection;
                         Some(n - 1)
                     }
-                    None => None,
-                    _ => unreachable!(),
+                    _ => None,
                 }
             };
         });

@@ -1,5 +1,5 @@
 use egui::Vec2;
-use egui_plot::{Legend, PlotBounds};
+use egui_plot::Legend;
 
 use crate::app::components::{File, FileHandler, FileID};
 

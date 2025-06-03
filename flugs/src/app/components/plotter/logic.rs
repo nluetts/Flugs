@@ -58,7 +58,17 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
         .with_ylabel(&app.config.y_label)
         .with_legend(true)
         .draw_xaxis(app.config.draw_xaxis)
-        .draw_yaxis(app.config.draw_yaxis);
+        .draw_yaxis(app.config.draw_yaxis)
+        .with_x_minor_ticks(app.config.num_x_minorticks)
+        .with_y_minor_ticks(app.config.num_y_minorticks);
+
+    // Overwrite axis ticks with ticks from config, if available.
+    if !app.config.x_ticks.pos.is_empty() {
+        app.config.x_ticks.pos.clone_into(&mut ax.ticks.xpos);
+    }
+    if !app.config.y_ticks.pos.is_empty() {
+        app.config.y_ticks.pos.clone_into(&mut ax.ticks.ypos);
+    }
 
     for (_, grp) in app
         .file_handler

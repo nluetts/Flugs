@@ -1,6 +1,7 @@
 use app_core::string_error::ErrorStringExt;
 use std::{
     io::{Read, Write},
+    num::ParseFloatError,
     path::PathBuf,
     str::FromStr,
 };
@@ -12,6 +13,10 @@ pub struct Config {
     pub svg_height: u64,
     pub x_label: String,
     pub y_label: String,
+    pub x_ticks: TicksInput,
+    pub y_ticks: TicksInput,
+    pub num_x_minorticks: usize,
+    pub num_y_minorticks: usize,
     pub draw_xaxis: bool,
     pub draw_yaxis: bool,
 }
@@ -32,12 +37,16 @@ impl Default for Config {
             y_label,
             draw_xaxis: true,
             draw_yaxis: true,
+            x_ticks: Default::default(),
+            y_ticks: Default::default(),
+            num_x_minorticks: 0,
+            num_y_minorticks: 0,
         }
     }
 }
 
 impl Config {
-    pub fn render(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
+    pub fn render(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         ui.heading("Preferences");
         ui.separator();
 
@@ -53,9 +62,13 @@ impl Config {
         ui.checkbox(&mut self.draw_xaxis, "Draw X-Axis");
         ui.label("X-Label");
         ui.text_edit_singleline(&mut self.x_label);
+        ui.label("Number of Minor X-Ticks");
+        ui.add(egui::DragValue::new(&mut self.num_x_minorticks).range(0..=9));
         ui.checkbox(&mut self.draw_yaxis, "Draw Y-Axis");
         ui.label("Y-Label");
         ui.text_edit_singleline(&mut self.y_label);
+        ui.label("Number of Minor Y-Ticks");
+        ui.add(egui::DragValue::new(&mut self.num_y_minorticks).range(0..=9));
 
         ui.separator();
 
@@ -64,6 +77,29 @@ impl Config {
                 log::error!("{e}");
             };
         }
+
+        ui.separator();
+        ui.heading("Temporary Settings");
+        ui.separator();
+
+        ui.label("X-Ticks");
+        if egui::TextEdit::singleline(&mut self.x_ticks.raw)
+            .text_color(self.x_ticks.color)
+            .show(ui)
+            .response
+            .changed()
+        {
+            let _ = self.x_ticks.parse(ctx);
+        };
+        ui.label("Y-Ticks");
+        if egui::TextEdit::singleline(&mut self.y_ticks.raw)
+            .text_color(self.y_ticks.color)
+            .show(ui)
+            .response
+            .changed()
+        {
+            let _ = self.y_ticks.parse(ctx);
+        };
     }
 }
 
@@ -128,6 +164,16 @@ impl Config {
                 (Some("y_label"), Some(y_label)) => {
                     config.y_label = y_label.to_string();
                 }
+                (Some("num_x_minorticks"), Some(num_str)) => {
+                    if let Ok(num) = num_str.parse::<usize>() {
+                        config.num_x_minorticks = num;
+                    }
+                }
+                (Some("num_y_minorticks"), Some(num_str)) => {
+                    if let Ok(num) = num_str.parse::<usize>() {
+                        config.num_y_minorticks = num;
+                    }
+                }
                 _ => continue,
             }
         }
@@ -163,6 +209,14 @@ impl Config {
         wrt_results
             .push(config_file.write_all(&format!("y_label={}\n", self.y_label).into_bytes()));
         wrt_results.push(
+            config_file
+                .write_all(&format!("num_x_minorticks={}\n", self.num_x_minorticks).into_bytes()),
+        );
+        wrt_results.push(
+            config_file
+                .write_all(&format!("num_y_minorticks={}\n", self.num_y_minorticks).into_bytes()),
+        );
+        wrt_results.push(
             config_file.write_all(
                 &format!(
                     "draw_xaxis={}\n",
@@ -187,6 +241,33 @@ impl Config {
             }
         }
 
+        Ok(())
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct TicksInput {
+    pub pos: Vec<f64>,
+    raw: String,
+    color: egui::Color32,
+}
+
+impl TicksInput {
+    fn parse(&mut self, ctx: &egui::Context) -> Result<(), ParseFloatError> {
+        self.pos.drain(..);
+        for s in self.raw.split(" ") {
+            let x = s.parse::<f64>();
+            if x.is_err() {
+                self.color = egui::Color32::RED;
+            }
+            self.pos.push(x?);
+        }
+
+        self.color = if ctx.theme() == egui::Theme::Light {
+            egui::Color32::BLACK
+        } else {
+            egui::Color32::WHITE
+        };
         Ok(())
     }
 }

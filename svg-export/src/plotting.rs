@@ -94,7 +94,7 @@ pub struct Axis {
     limits: [f64; 4],
     plots: Vec<LinePlot>,
     style: svg::Params,
-    ticks: Ticks,
+    pub ticks: Ticks,
     /// u coordinate for placement in Figure, normalized to [0, 1]
     u: f64,
     /// v coordinate for placement in Figure, normalized to [0, 1]
@@ -169,6 +169,16 @@ impl Axis {
 
     pub fn draw_yaxis(mut self, should_draw: bool) -> Self {
         self.draw_yaxis = should_draw;
+        self
+    }
+
+    pub fn with_x_minor_ticks(mut self, num: usize) -> Self {
+        self.ticks.x_num_minor = num;
+        self
+    }
+
+    pub fn with_y_minor_ticks(mut self, num: usize) -> Self {
+        self.ticks.y_num_minor = num;
         self
     }
 
@@ -596,8 +606,10 @@ impl Element for Text {
 
 /// The ticks of the axes. Includes ticks and tick labels.
 pub struct Ticks {
-    xpos: Vec<f64>,
-    ypos: Vec<f64>,
+    pub xpos: Vec<f64>,
+    pub ypos: Vec<f64>,
+    pub x_num_minor: usize,
+    pub y_num_minor: usize,
     color: String,
     linewidth: f64,
     style: svg::Params,
@@ -608,6 +620,8 @@ impl Default for Ticks {
         Self {
             xpos: Vec::new(),
             ypos: Vec::new(),
+            x_num_minor: 3,
+            y_num_minor: 3,
             color: "black".to_string(),
             linewidth: 1.0,
             style: Params::new(),
@@ -625,6 +639,7 @@ impl Element for Ticks {
             ("stroke", &self.color[..]),
             ("stroke-width", &width_param[..]),
         ];
+        let style_minor = [("stroke", "lightgray"), ("stroke-width", &width_param[..])];
         let style_xtick_label = [("text-anchor", "middle")];
         let style_ytick_label = [("text-anchor", "end")];
 
@@ -634,11 +649,11 @@ impl Element for Ticks {
         let (xtick_labels, ytick_labels) = self.format_ticks();
 
         if ax.draw_xaxis {
-            for (xi, li) in self.xpos.iter().zip(xtick_labels) {
-                let lt =
-                    Tag::<svg::Line>::new(x(u(*xi)), x(u(*xi)), y(0.99), y(1.01), opts(&style));
+            let mut iter = self.xpos.iter().zip(xtick_labels).peekable();
+            while let Some((&xi, li)) = iter.next() {
+                let lt = Tag::<svg::Line>::new(x(u(xi)), x(u(xi)), y(0.99), y(1.01), opts(&style));
                 let tt = Tag::<svg::Text>::new(
-                    x(u(*xi)),
+                    x(u(xi)),
                     y(1.05),
                     0.0,
                     &li,
@@ -646,22 +661,59 @@ impl Element for Ticks {
                 );
                 xticks.push(Box::new(lt));
                 xticks.push(Box::new(tt));
+
+                // Draw minor ticks.
+                if let Some((&xj, _)) = iter.peek() {
+                    if self.x_num_minor == 0 {
+                        continue;
+                    }
+                    let step = (xj - xi) / (self.x_num_minor as f64 + 1.0);
+                    for i in 1..=self.x_num_minor {
+                        let lt = Tag::<svg::Line>::new(
+                            x(u(xi + i as f64 * step)),
+                            x(u(xi + i as f64 * step)),
+                            y(0.99),
+                            y(1.01),
+                            opts(&style_minor),
+                        );
+                        xticks.push(Box::new(lt));
+                    }
+                }
             }
         }
 
         if ax.draw_yaxis {
-            for (yi, li) in self.ypos.iter().zip(ytick_labels) {
+            let mut iter = self.ypos.iter().zip(ytick_labels).peekable();
+            while let Some((&yi, li)) = iter.next() {
                 let lt =
-                    Tag::<svg::Line>::new(x(-0.005), x(0.005), y(v(*yi)), y(v(*yi)), opts(&style));
+                    Tag::<svg::Line>::new(x(-0.005), x(0.005), y(v(yi)), y(v(yi)), opts(&style));
                 let tt = Tag::<svg::Text>::new(
                     x(-0.03),
-                    y(v(*yi) + 0.02),
+                    y(v(yi) + 0.02),
                     0.0,
                     &li,
                     opts(&style_ytick_label.clone()),
                 );
                 yticks.push(Box::new(lt));
                 yticks.push(Box::new(tt));
+
+                // Draw minor ticks.
+                if let Some((&yj, _)) = iter.peek() {
+                    if self.y_num_minor == 0 {
+                        continue;
+                    }
+                    let step = (yj - yi) / (self.y_num_minor as f64 + 1.0);
+                    for i in 1..=self.x_num_minor {
+                        let lt = Tag::<svg::Line>::new(
+                            x(-0.005),
+                            x(0.005),
+                            y(v(yi + i as f64 * step)),
+                            y(v(yi + i as f64 * step)),
+                            opts(&style_minor),
+                        );
+                        yticks.push(Box::new(lt));
+                    }
+                }
             }
         }
 

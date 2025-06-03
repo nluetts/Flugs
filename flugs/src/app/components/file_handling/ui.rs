@@ -270,6 +270,17 @@ impl File {
         ui.label("Y-Scale: ");
         let dragv = egui::DragValue::new(&mut self.properties.yscale);
         ui.add(dragv);
+        ui.horizontal(|ui| {
+            ui.label("Custom Color: ");
+            if let Some(color) = self.properties.color.as_mut() {
+                ui.color_edit_button_srgba(color);
+            } else {
+                let mut color = egui::Color32::RED;
+                if ui.color_edit_button_srgba(&mut color).clicked() {
+                    self.properties.color = Some(color);
+                };
+            }
+        });
 
         ui.label("Comment:");
         egui::TextEdit::multiline(&mut self.properties.comment)

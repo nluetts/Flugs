@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use crate::app::DynRequestSender;
 use crate::backend_state::PlotData;
 use app_core::frontend::UIParameter;
+use egui::Color32;
 use logic::parse_csv;
 use serde::{Deserialize, Serialize};
 
@@ -37,6 +38,7 @@ pub struct FileProperties {
     pub xoffset: f64,
     pub yoffset: f64,
     pub yscale: f64,
+    pub color: Option<Color32>,
     pub comment: String,
 }
 
@@ -98,6 +100,7 @@ impl Default for FileProperties {
             xoffset: 0.0,
             yoffset: 0.0,
             yscale: 1.0,
+            color: None,
             comment: String::new(),
         }
     }

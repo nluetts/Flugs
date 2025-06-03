@@ -56,7 +56,9 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
         .with_ylim(ymin, ymax)
         .with_xlabel(&app.config.x_label)
         .with_ylabel(&app.config.y_label)
-        .with_legend(true);
+        .with_legend(true)
+        .draw_xaxis(app.config.draw_xaxis)
+        .draw_yaxis(app.config.draw_yaxis);
 
     for (_, grp) in app
         .file_handler
@@ -70,11 +72,11 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
         }
         for fid in grp.file_ids.iter() {
             // I'll need `file` later for labels.
-            if let Some((cached_data, plot_file)) =
-                app.file_handler
-                    .registry
-                    .get(fid)
-                    .and_then(|file| file.get_cache().map(|cache| (cache, file)))
+            if let Some((cached_data, plot_file)) = app
+                .file_handler
+                .registry
+                .get(fid)
+                .and_then(|file| file.get_cache().map(|cache| (cache, file)))
             {
                 // Color for current file.
                 let color: String = {

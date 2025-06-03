@@ -85,7 +85,11 @@ impl Default for Figure {
 /// The container for plots and other elements.
 pub struct Axis {
     draw_legend: bool,
+    draw_xaxis: bool,
+    draw_yaxis: bool,
     elements: Vec<Box<dyn Element>>,
+    xlabel: String,
+    ylabel: String,
     height: f64,
     limits: [f64; 4],
     plots: Vec<LinePlot>,
@@ -108,9 +112,13 @@ impl Axis {
             limits: [0.0, 1.0, 0.0, 1.0],
             ticks: Default::default(),
             draw_legend: false,
+            draw_xaxis: true,
+            draw_yaxis: true,
             plots: Vec::new(),
             elements: Vec::new(),
-            style: element_opts(&[("fill", "white"), ("stroke", "black")]),
+            style: element_opts(&[("fill", "none"), ("stroke", "none")]),
+            xlabel: "".to_string(),
+            ylabel: "".to_string(),
         }
     }
 
@@ -139,14 +147,7 @@ impl Axis {
     }
 
     pub fn with_xlabel(mut self, text: &str) -> Self {
-        let xlabel = Text {
-            text: text.to_owned(),
-            u: 0.5,
-            v: -0.1,
-            angle: 0.0,
-            style: element_opts(&[("text-anchor", "middle")]),
-        };
-        self.add_label(xlabel);
+        self.xlabel = text.to_owned();
         self
     }
 
@@ -157,15 +158,17 @@ impl Axis {
     }
 
     pub fn with_ylabel(mut self, text: &str) -> Self {
-        let y_tick_label_width = self.ticks.y_tick_label_character_width();
-        let ylabel = Text {
-            text: text.to_owned(),
-            u: -0.075 - 0.005 * y_tick_label_width as f64,
-            v: 0.5,
-            angle: 270.0,
-            style: element_opts(&[("text-anchor", "middle")]),
-        };
-        self.add_label(ylabel);
+        self.ylabel = text.to_owned();
+        self
+    }
+
+    pub fn draw_xaxis(mut self, should_draw: bool) -> Self {
+        self.draw_xaxis = should_draw;
+        self
+    }
+
+    pub fn draw_yaxis(mut self, should_draw: bool) -> Self {
+        self.draw_yaxis = should_draw;
         self
     }
 
@@ -275,6 +278,32 @@ impl Axis {
                 })
                 .unwrap_or(Vec::new()),
         );
+
+        // Add axis labels.
+        if self.draw_xaxis && !self.xlabel.is_empty() {
+            let xlabel = Text {
+                text: self.xlabel.to_owned(),
+                u: 0.5,
+                v: -0.1,
+                angle: 0.0,
+                style: element_opts(&[("text-anchor", "middle")]),
+            }
+            .to_tags(&self, &fig);
+            children.extend(xlabel);
+        }
+        if self.draw_yaxis && !self.ylabel.is_empty() {
+            let y_tick_label_width = self.ticks.y_tick_label_character_width();
+            let ylabel = Text {
+                text: self.ylabel.to_owned(),
+                u: -0.075 - 0.005 * y_tick_label_width as f64,
+                v: 0.5,
+                angle: 270.0,
+                style: element_opts(&[("text-anchor", "middle")]),
+            }
+            .to_tags(&self, &fig);
+            children.extend(ylabel);
+        }
+
         if self.draw_legend {
             let mut legend_elements = Vec::new();
             for (i, p) in self.plots.iter().filter(|p| !p.name.is_empty()).enumerate() {
@@ -604,30 +633,38 @@ impl Element for Ticks {
 
         let (xtick_labels, ytick_labels) = self.format_ticks();
 
-        for (xi, li) in self.xpos.iter().zip(xtick_labels) {
-            let lt = Tag::<svg::Line>::new(x(u(*xi)), x(u(*xi)), y(0.99), y(1.01), opts(&style));
-            let tt = Tag::<svg::Text>::new(
-                x(u(*xi)),
-                y(1.05),
-                0.0,
-                &li,
-                opts(&style_xtick_label.clone()),
-            );
-            xticks.push(Box::new(lt));
-            xticks.push(Box::new(tt));
+        if ax.draw_xaxis {
+            for (xi, li) in self.xpos.iter().zip(xtick_labels) {
+                let lt =
+                    Tag::<svg::Line>::new(x(u(*xi)), x(u(*xi)), y(0.99), y(1.01), opts(&style));
+                let tt = Tag::<svg::Text>::new(
+                    x(u(*xi)),
+                    y(1.05),
+                    0.0,
+                    &li,
+                    opts(&style_xtick_label.clone()),
+                );
+                xticks.push(Box::new(lt));
+                xticks.push(Box::new(tt));
+            }
         }
-        for (yi, li) in self.ypos.iter().zip(ytick_labels) {
-            let lt = Tag::<svg::Line>::new(x(-0.005), x(0.005), y(v(*yi)), y(v(*yi)), opts(&style));
-            let tt = Tag::<svg::Text>::new(
-                x(-0.03),
-                y(v(*yi) + 0.02),
-                0.0,
-                &li,
-                opts(&style_ytick_label.clone()),
-            );
-            yticks.push(Box::new(lt));
-            yticks.push(Box::new(tt));
+
+        if ax.draw_yaxis {
+            for (yi, li) in self.ypos.iter().zip(ytick_labels) {
+                let lt =
+                    Tag::<svg::Line>::new(x(-0.005), x(0.005), y(v(*yi)), y(v(*yi)), opts(&style));
+                let tt = Tag::<svg::Text>::new(
+                    x(-0.03),
+                    y(v(*yi) + 0.02),
+                    0.0,
+                    &li,
+                    opts(&style_ytick_label.clone()),
+                );
+                yticks.push(Box::new(lt));
+                yticks.push(Box::new(tt));
+            }
         }
+
         xticks.extend(yticks);
         xticks
     }

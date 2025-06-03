@@ -1,5 +1,5 @@
 use egui::Vec2;
-use egui_plot::Legend;
+use egui_plot::{Legend, PlotBounds};
 
 use crate::app::components::{File, FileHandler, FileID};
 
@@ -74,11 +74,12 @@ impl super::Plotter {
                             && plot_ui.response().contains_pointer()
                             && inside_plot
                         {
-                            if let (Some(origin), Some(current_position)) = (i.pointer.press_origin(), i.pointer.latest_pos()) {
+                            if let (Some(origin), Some(current_position)) =
+                                (i.pointer.press_origin(), i.pointer.latest_pos())
+                            {
                                 // Pointer positions are in screen coordinates and must be translated into
                                 // the coordinate system of the plot.
-                                let origin =
-                                    plot_ui.transform().value_from_position(origin).x;
+                                let origin = plot_ui.transform().value_from_position(origin).x;
                                 let current_position =
                                     plot_ui.transform().value_from_position(current_position).x;
                                 self.current_integral = Some((origin, current_position))
@@ -121,7 +122,7 @@ impl super::Plotter {
                     [xmin, xmax, ymin, ymax]
                 };
 
-                // We need to "exfiltrate" the corrent plot bounds
+                // We need to "exfiltrate" the current plot bounds
                 // and whether the plot was clicked from this closure.
                 (plot_ui.plot_bounds(), plot_ui.response().clicked())
             });
@@ -187,7 +188,11 @@ impl super::Plotter {
                 .collect();
 
             // Plot the data.
-            let color = auto_color(Into::<i32>::into(*fid));
+            let color = if let Some(color) = file.properties.color {
+                color
+            } else {
+                auto_color(Into::<i32>::into(*fid))
+            };
             let width = if self.selected_fid.is_some_and(|sfid| sfid == *fid) {
                 2.5
             } else {
@@ -222,7 +227,8 @@ impl super::Plotter {
                         })
                         .collect::<Vec<[f64; 2]>>();
                     // TODO: how to plot area under curve down to a local baseline.
-                    if let (Some([x0, y0]), Some([x1, y1])) = (plot_data.first(), plot_data.last()) {
+                    if let (Some([x0, y0]), Some([x1, y1])) = (plot_data.first(), plot_data.last())
+                    {
                         // Local baseline.
                         let line_data: Vec<_> = plot_data
                             .iter()
@@ -317,6 +323,9 @@ impl super::Plotter {
                         ui.horizontal(|ui| {
                             let scale_button = egui::Button::new(label_text.clone()).truncate();
                             let area = file.integrate(*a, *b, self.integrate_with_local_baseline);
+                            if !area.is_finite() {
+                                return;
+                            }
                             if scale_all
                                 || ui
                                     .add(scale_button)
@@ -331,7 +340,6 @@ impl super::Plotter {
                                 // Optionally shift curve to make all plots align automatically.
                                 if self.auto_shift_after_scaling {
                                     let offset = file.local_minimum(*a, *b, false);
-                                    // dbg!(offset);
                                     let ymin = match file.data.value() {
                                         Ok(data) => data.ymin().unwrap_or_default(),
                                         Err(_) => 0.0,

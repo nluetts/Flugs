@@ -12,6 +12,8 @@ pub struct Config {
     pub svg_height: u64,
     pub x_label: String,
     pub y_label: String,
+    pub draw_xaxis: bool,
+    pub draw_yaxis: bool,
 }
 
 impl Default for Config {
@@ -28,6 +30,8 @@ impl Default for Config {
             svg_height,
             x_label,
             y_label,
+            draw_xaxis: true,
+            draw_yaxis: true,
         }
     }
 }
@@ -46,8 +50,10 @@ impl Config {
         ui.add(egui::DragValue::new(&mut self.svg_width).speed(10));
         ui.label("Height of exported SVG");
         ui.add(egui::DragValue::new(&mut self.svg_height).speed(10));
+        ui.checkbox(&mut self.draw_xaxis, "Draw X-Axis");
         ui.label("X-Label");
         ui.text_edit_singleline(&mut self.x_label);
+        ui.checkbox(&mut self.draw_yaxis, "Draw Y-Axis");
         ui.label("Y-Label");
         ui.text_edit_singleline(&mut self.y_label);
 
@@ -104,8 +110,20 @@ impl Config {
                         log::warn!("could not parse 'svg_height' as number")
                     }
                 }
+                (Some("draw_xaxis"), Some("true")) => {
+                    config.draw_xaxis = true;
+                }
+                (Some("draw_xaxis"), Some("false")) => {
+                    config.draw_xaxis = false;
+                }
                 (Some("x_label"), Some(x_label)) => {
                     config.x_label = x_label.to_string();
+                }
+                (Some("draw_yaxis"), Some("true")) => {
+                    config.draw_yaxis = true;
+                }
+                (Some("draw_yaxis"), Some("false")) => {
+                    config.draw_yaxis = false;
                 }
                 (Some("y_label"), Some(y_label)) => {
                     config.y_label = y_label.to_string();
@@ -144,6 +162,24 @@ impl Config {
             .push(config_file.write_all(&format!("x_label={}\n", self.x_label).into_bytes()));
         wrt_results
             .push(config_file.write_all(&format!("y_label={}\n", self.y_label).into_bytes()));
+        wrt_results.push(
+            config_file.write_all(
+                &format!(
+                    "draw_xaxis={}\n",
+                    if self.draw_xaxis { "true" } else { "false" }
+                )
+                .into_bytes(),
+            ),
+        );
+        wrt_results.push(
+            config_file.write_all(
+                &format!(
+                    "draw_yaxis={}\n",
+                    if self.draw_yaxis { "true" } else { "false" }
+                )
+                .into_bytes(),
+            ),
+        );
 
         for res in wrt_results {
             if let Err(e) = res {

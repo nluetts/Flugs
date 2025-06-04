@@ -762,10 +762,15 @@ pub struct LinePlot {
 
 impl LinePlot {
     pub fn new(xs: &[f64], ys: &[f64]) -> Self {
+        // Set default style.
+        let mut style = svg::Params::new();
+        style.insert("stroke-linejoin".to_string(), "round".to_string());
+        style.insert("stroke-width".to_string(), "2".to_string());
+        style.insert("mix-blend-mode".to_string(), "multiply".to_string());
         Self {
             xs: xs.to_vec(),
             ys: ys.to_vec(),
-            style: svg::Params::new(),
+            style,
             name: String::new(),
         }
     }

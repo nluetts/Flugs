@@ -91,9 +91,11 @@ impl EguiApp {
 
 impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if let Some(_) = self.request_redraw.take() {
-            ctx.request_repaint();
-        }
+        // TODO: drawing spectra after loading them does not yet update the UI, no idea why
+        // if let Some(_) = self.request_redraw.take() {
+        //     ctx.request_repaint();
+        // }
+        ctx.request_repaint_after(std::time::Duration::from_millis(300));
 
         self.update_state();
 

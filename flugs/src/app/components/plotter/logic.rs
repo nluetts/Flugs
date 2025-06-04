@@ -138,7 +138,7 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
 
                 let line = LinePlot::new(&xs, &ys)
                     .with_color(&color)
-                    .with_linewidth(1.0)
+                    .with_linewidth(app.config.plot_linewidth)
                     .with_name(&label);
 
                 ax.add_line(line);

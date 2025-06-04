@@ -10,6 +10,7 @@ pub struct Config {
     pub search_path: PathBuf,
     pub svg_width: u64,
     pub svg_height: u64,
+    pub plot_linewidth: f64,
     pub x_label: String,
     pub y_label: String,
     pub x_ticks: TicksInput,
@@ -32,6 +33,7 @@ impl Default for Config {
             search_path,
             svg_width,
             svg_height,
+            plot_linewidth: 2.0,
             x_label,
             y_label,
             draw_xaxis: true,
@@ -54,10 +56,16 @@ impl Config {
         ui.text_edit_singleline(&mut path);
         self.search_path = path.to_string().into();
 
-        ui.label("Width of exported SVG");
+        ui.label("Width of Exported SVG");
         ui.add(egui::DragValue::new(&mut self.svg_width).speed(10));
-        ui.label("Height of exported SVG");
+        ui.label("Height of Exported SVG");
         ui.add(egui::DragValue::new(&mut self.svg_height).speed(10));
+        ui.label("Width of Plot Lines");
+        ui.add(
+            egui::DragValue::new(&mut self.plot_linewidth)
+                .range(0.5..=5.0)
+                .speed(0.5),
+        );
         ui.checkbox(&mut self.draw_xaxis, "Draw X-Axis");
         ui.label("X-Label");
         ui.text_edit_singleline(&mut self.x_label);
@@ -145,6 +153,13 @@ impl Config {
                         log::warn!("could not parse 'svg_height' as number")
                     }
                 }
+                (Some("plot_linewidth"), Some(plot_linewidth)) => {
+                    if let Ok(width) = plot_linewidth.parse::<f64>() {
+                        config.plot_linewidth = width;
+                    } else {
+                        log::warn!("could not parse 'plot_linewidth' as number")
+                    }
+                }
                 (Some("draw_xaxis"), Some("true")) => {
                     config.draw_xaxis = true;
                 }
@@ -203,6 +218,10 @@ impl Config {
             .push(config_file.write_all(&format!("svg_width={}\n", self.svg_width).into_bytes()));
         wrt_results
             .push(config_file.write_all(&format!("svg_height={}\n", self.svg_height).into_bytes()));
+        wrt_results.push(
+            config_file
+                .write_all(&format!("plot_linewidth={}\n", self.plot_linewidth).into_bytes()),
+        );
         wrt_results
             .push(config_file.write_all(&format!("x_label={}\n", self.x_label).into_bytes()));
         wrt_results

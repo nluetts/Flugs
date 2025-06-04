@@ -703,7 +703,7 @@ impl Element for Ticks {
                         continue;
                     }
                     let step = (yj - yi) / (self.y_num_minor as f64 + 1.0);
-                    for i in 1..=self.x_num_minor {
+                    for i in 1..=self.y_num_minor {
                         let lt = Tag::<svg::Line>::new(
                             x(-0.005),
                             x(0.005),

@@ -14,7 +14,7 @@ use storage::{load_json, save_json};
 pub use crate::app::components::FileHandler;
 pub use crate::app::components::PlotterMode;
 
-use std::{sync::mpsc::Sender, thread::JoinHandle, time::Duration};
+use std::{sync::mpsc::Sender, thread::JoinHandle};
 
 pub type DynRequestSender = Sender<Box<dyn BackendRequest<BackendAppState>>>;
 
@@ -28,6 +28,7 @@ pub struct EguiApp {
     shortcuts_modal_open: bool,
     ui_selection: UISelection,
     event_queue: EventQueue<Self>,
+    request_redraw: Option<()>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -67,6 +68,7 @@ impl EguiApp {
             shortcuts_modal_open: false,
             ui_selection: UISelection::Plot,
             event_queue: EventQueue::<Self>::new(),
+            request_redraw: None,
         }
     }
 
@@ -77,14 +79,22 @@ impl EguiApp {
 
     fn update_state(&mut self) {
         self.run_events();
-        self.file_handler.try_update();
-        self.search.try_update();
+        if self.file_handler.try_update() || self.search.try_update() {
+            self.request_redraw();
+        }
+    }
+
+    pub fn request_redraw(&mut self) {
+        self.request_redraw = Some(());
     }
 }
 
 impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.request_repaint_after(Duration::from_millis(50));
+        if let Some(_) = self.request_redraw.take() {
+            ctx.request_repaint();
+        }
+
         self.update_state();
 
         let mut should_quit = false;

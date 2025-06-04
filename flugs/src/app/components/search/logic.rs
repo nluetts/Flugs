@@ -5,9 +5,7 @@ use app_core::backend::{BackendEventLoop, BackendLink};
 use crate::{app::DynRequestSender, BackendAppState};
 
 impl super::Search {
-    pub fn try_update(&mut self) {
-        self.search_path.try_update();
-        self.matches.try_update();
+    pub fn try_update(&mut self) -> bool {
         // Receive new search path, if already available.
         if let Some(handle) = self
             .awaiting_search_path_selection
@@ -20,6 +18,7 @@ impl super::Search {
                 Err(err) => log::error!("Unable to set new search directory: {:?}", err),
             }
         }
+        self.search_path.try_update() || self.matches.try_update()
     }
 
     pub fn set_search_path(&mut self, path: &Path) {

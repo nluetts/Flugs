@@ -33,6 +33,14 @@ impl super::Plotter {
             _ => (),
         }
     }
+
+    pub fn apply_bounds(&mut self, bounds: [f64; 4]) {
+        self.request_plot_bounds = Some(bounds);
+    }
+
+    pub fn get_current_plot_bounds(&self) -> [f64; 4] {
+        self.current_plot_bounds
+    }
 }
 
 pub fn save_svg(app: &EguiApp, path: &std::path::Path) {

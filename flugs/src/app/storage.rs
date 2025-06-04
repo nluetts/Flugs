@@ -24,6 +24,7 @@ struct FrontendStorage {
     groups: [Option<Group>; 10],
     registry: HashMap<FileID, FileStorage>,
     next_id: FileID,
+    plot_bounds: Option<[f64; 4]>,
 }
 
 pub fn save_json(app: &EguiApp, path: Option<&Path>) -> Result<(), String> {
@@ -47,6 +48,7 @@ pub fn save_json(app: &EguiApp, path: Option<&Path>) -> Result<(), String> {
             })
             .collect(),
         next_id: app.file_handler.current_id(),
+        plot_bounds: Some(app.plotter.get_current_plot_bounds()),
     };
     let storage = Storage::new(backend_storage, frontend_storage);
     storage.save_json(path)
@@ -59,7 +61,11 @@ pub fn load_json(app: &mut EguiApp, path: Option<&Path>) -> Result<(), String> {
     } = Storage::load_json(path)?;
 
     app.search.set_search_path(&frontend_storage.search_path);
+    if let Some(bounds) = frontend_storage.plot_bounds {
+        app.plotter.apply_bounds(bounds);
+    }
     app.file_handler = frontend_storage.into_file_handler(&mut app.request_tx);
+    app.request_redraw();
     Ok(())
 }
 

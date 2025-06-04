@@ -1,5 +1,5 @@
 use egui::Vec2;
-use egui_plot::Legend;
+use egui_plot::{Legend, PlotBounds};
 
 use crate::app::components::{File, FileHandler, FileID};
 
@@ -33,6 +33,13 @@ impl super::Plotter {
             })
             .legend(Legend::default())
             .show(ui, |plot_ui| {
+                if let Some(bounds) = self.request_plot_bounds.take() {
+                    plot_ui.set_plot_bounds(PlotBounds::from_min_max(
+                        [bounds[0], bounds[2]],
+                        [bounds[1], bounds[3]],
+                    ));
+                }
+
                 // Context menu, based on current mode.
                 match self.mode {
                     // In display mode, we show the file properties menu.

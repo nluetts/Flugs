@@ -55,7 +55,7 @@ impl EguiApp {
         while let Some(mut event) = self.event_queue.queue.pop() {
             match event.apply(self) {
                 Ok(EventState::Finished) => {
-                    // Great, nothing to do.
+                    self.request_redraw();
                 }
                 Ok(EventState::Busy) => {
                     // Add busy event to the backlog.

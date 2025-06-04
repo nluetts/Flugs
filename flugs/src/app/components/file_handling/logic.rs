@@ -73,7 +73,6 @@ impl File {
             );
 
         // Apply trapezoidal integration.
-        
 
         match trapz(&xs, &ys, left, right, local_baseline) {
             Ok(area) => area,
@@ -298,10 +297,12 @@ impl FileHandler {
             .unwrap_or("unreadable filename")
     }
 
-    pub fn try_update(&mut self) {
+    pub fn try_update(&mut self) -> bool {
+        let mut was_updated = false;
         for file in self.registry.values_mut() {
-            file.data.try_update();
+            was_updated = was_updated || file.data.try_update();
         }
+        was_updated
     }
 }
 

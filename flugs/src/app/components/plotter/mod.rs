@@ -16,6 +16,7 @@ pub struct Plotter {
     current_integral: Option<(f64, f64)>,
     integrate_with_local_baseline: bool,
     auto_shift_after_scaling: bool,
+    request_plot_bounds: Option<[f64; 4]>,
     pub mode: PlotterMode,
 }
 
@@ -29,6 +30,7 @@ impl Plotter {
             mode: PlotterMode::Display,
             // TODO: make this a global option
             integrate_with_local_baseline: true,
+            request_plot_bounds: None,
             auto_shift_after_scaling: false,
         }
     }

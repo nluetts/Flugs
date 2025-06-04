@@ -24,21 +24,25 @@ impl<T: Clone> UIParameter<T> {
         }
     }
 
-    pub fn try_update(&mut self) {
+    pub fn try_update(&mut self) -> bool {
         if let Some(rx) = &self.pending_update_rx {
             match rx.try_recv() {
                 Ok(val) => {
                     self.value = val;
                     self.pending_update_rx = None;
+                    true
                 }
                 Err(err) => match err {
-                    TryRecvError::Empty => (),
+                    TryRecvError::Empty => false,
                     TryRecvError::Disconnected => {
                         warn!("Tried to receive message from closed channel.");
                         self.pending_update_rx = None;
+                        true
                     }
                 },
             }
+        } else {
+            false
         }
     }
 

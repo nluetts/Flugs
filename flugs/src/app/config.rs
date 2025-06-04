@@ -1,7 +1,6 @@
 use app_core::string_error::ErrorStringExt;
 use std::{
     io::{Read, Write},
-    num::ParseFloatError,
     path::PathBuf,
     str::FromStr,
 };
@@ -253,21 +252,50 @@ pub struct TicksInput {
 }
 
 impl TicksInput {
-    fn parse(&mut self, ctx: &egui::Context) -> Result<(), ParseFloatError> {
+    fn parse(&mut self, ctx: &egui::Context) -> Result<(), ()> {
+        let res = self.parse_inner();
+        if res.is_err() {
+            self.color = egui::Color32::RED;
+        } else {
+            self.color = if ctx.theme() == egui::Theme::Light {
+                egui::Color32::BLACK
+            } else {
+                egui::Color32::WHITE
+            };
+        }
+        Ok(())
+    }
+
+    fn parse_inner(&mut self) -> Result<(), ()> {
         self.pos.drain(..);
         for s in self.raw.split(" ") {
-            let x = s.parse::<f64>();
-            if x.is_err() {
-                self.color = egui::Color32::RED;
+            // Handle input of range (syntax is "start:stop:step").
+            if s.contains(":") {
+                let mut parts = s.split(":");
+                let mut current = parts.next().and_then(|s| s.parse::<f64>().ok()).ok_or(())?;
+                let step = parts.next().and_then(|s| s.parse::<f64>().ok()).ok_or(())?;
+                let stop = parts.next().and_then(|s| s.parse::<f64>().ok()).ok_or(())?;
+                // Handle a couple of wrong inputs, such as wrong sign of step ...
+                if (stop - current).is_sign_positive() && step.is_sign_negative() {
+                    return Err(());
+                }
+                if (stop - current).is_sign_negative() && step.is_sign_positive() {
+                    return Err(());
+                }
+                // ... or no step at all.
+                if step == 0.0 {
+                    return Err(());
+                }
+                while current <= stop {
+                    self.pos.push(current);
+                    current += step;
+                }
+            // Handle specific numbers.
+            } else {
+                let x = s.parse::<f64>().map_err(|_| ())?;
+                self.pos.push(x);
             }
-            self.pos.push(x?);
         }
-
-        self.color = if ctx.theme() == egui::Theme::Light {
-            egui::Color32::BLACK
-        } else {
-            egui::Color32::WHITE
-        };
         Ok(())
     }
 }

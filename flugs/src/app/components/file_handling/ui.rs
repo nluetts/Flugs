@@ -200,35 +200,43 @@ impl FileHandler {
         ui.separator();
 
         egui::CollapsingHeader::new("Metadata Header").show(ui, |ui| {
-            egui::ScrollArea::new([true, false]).show(ui, |ui| {
-                let comments = file
-                    .data
-                    .value()
-                    .as_ref()
-                    .map(|data| data.get_comments())
-                    .unwrap_or_default();
-                if !comments.is_empty() {
-                    ui.label(comments);
-                }
-            })
+            egui::ScrollArea::new([true, true])
+                .max_height(300.0)
+                .max_width(800.0)
+                .show(ui, |ui| {
+                    let comments = file
+                        .data
+                        .value()
+                        .as_ref()
+                        .map(|data| data.get_comments())
+                        .unwrap_or_default();
+                    if !comments.is_empty() {
+                        for line in comments.lines() {
+                            ui.add(egui::Label::new(line).wrap_mode(egui::TextWrapMode::Extend));
+                        }
+                    }
+                })
         });
 
         egui::CollapsingHeader::new("Contents").show(ui, |ui| {
-            egui::ScrollArea::new([true, false]).show(ui, |ui| {
-                let mut contents = String::with_capacity(10_000);
-                let Ok(data) = file.data.value() else { return };
-                let Some(xs) = data.columns.first() else {
-                    return;
-                };
-                let Some(ys) = data.columns.first() else {
-                    return;
-                };
-                for (x, y) in xs.iter().zip(ys) {
-                    let _ = writeln!(contents, "{x}, {y}");
-                }
-
-                ui.label(contents);
-            })
+            egui::ScrollArea::new([true, true])
+                .max_height(300.0)
+                .max_width(800.0)
+                .show(ui, |ui| {
+                    let Ok(data) = file.data.value() else { return };
+                    let Some(xs) = data.columns.first() else {
+                        return;
+                    };
+                    let Some(ys) = data.columns.iter().nth(1) else {
+                        return;
+                    };
+                    for (x, y) in xs.iter().zip(ys) {
+                        ui.add(
+                            egui::Label::new(format!("{x}, {y}"))
+                                .wrap_mode(egui::TextWrapMode::Extend),
+                        );
+                    }
+                })
         });
 
         // Menu to move/copy file to other group.

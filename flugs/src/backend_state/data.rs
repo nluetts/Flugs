@@ -78,6 +78,10 @@ impl PlotData {
             .and_then(|ys| ys.iter().reduce(|a, b| if a < b { a } else { b }))
             .copied()
     }
+
+    pub fn get_comments(&self) -> String {
+        self.comments.clone()
+    }
 }
 
 impl PlotCache {

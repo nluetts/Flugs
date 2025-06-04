@@ -199,6 +199,20 @@ impl FileHandler {
 
         ui.separator();
 
+        egui::CollapsingHeader::new("Metadata Header").show(ui, |ui| {
+            egui::ScrollArea::new([true, false]).show(ui, |ui| {
+                let comments = file
+                    .data
+                    .value()
+                    .as_ref()
+                    .map(|data| data.get_comments())
+                    .unwrap_or_default();
+                if !comments.is_empty() {
+                    ui.label(comments);
+                }
+            })
+        });
+
         egui::CollapsingHeader::new("Contents").show(ui, |ui| {
             egui::ScrollArea::new([true, false]).show(ui, |ui| {
                 let mut contents = String::with_capacity(10_000);

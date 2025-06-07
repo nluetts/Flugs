@@ -10,6 +10,15 @@ pub struct UIParameter<T> {
     value: T,
 }
 
+impl<T: Clone> Clone for UIParameter<T> {
+    fn clone(&self) -> Self {
+        Self {
+            pending_update_rx: None,
+            value: self.value.clone(),
+        }
+    }
+}
+
 impl<T: Default + Clone> Default for UIParameter<T> {
     fn default() -> Self {
         Self::new(T::default())

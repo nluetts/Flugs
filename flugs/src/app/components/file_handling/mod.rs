@@ -25,7 +25,7 @@ pub struct FileHandler {
     active_element: ActiveElement,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct File {
     pub data: UIParameter<Result<PlotData, String>>,
     pub path: PathBuf,

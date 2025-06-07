@@ -104,6 +104,12 @@ pub struct CopyFile {
 }
 
 #[derive(new)]
+pub struct CloneFile {
+    fid: FileID,
+    to_group: usize,
+}
+
+#[derive(new)]
 pub struct RemoveGroup {
     gid: usize,
 }
@@ -146,6 +152,41 @@ impl AppEvent for CopyFile {
 
     fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
         let Self { fid, to_group } = *self;
+
+        if let Some(grp) = app
+            .file_handler
+            .groups
+            .get_mut(to_group)
+            .and_then(|grp| grp.as_mut())
+        {
+            if !grp.file_ids.contains(&fid) {
+                grp.file_ids.push(fid);
+            }
+        } else {
+            log::debug!("creating new group at slot {}", to_group);
+            let mut grp = Group {
+                name: format!("Group {}", to_group),
+                ..Default::default()
+            };
+            grp.file_ids.push(fid);
+            app.file_handler.groups[to_group] = Some(grp);
+        }
+        Ok(EventState::Finished)
+    }
+}
+
+impl AppEvent for CloneFile {
+    type App = EguiApp;
+
+    fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
+        let Self { fid, to_group } = *self;
+
+        // Make a copy of the file in the registy.
+        let fid = if let Some(file) = app.file_handler.registry.get(&fid) {
+            app.file_handler.add_new_file(file.clone())
+        } else {
+            return Err(format!("Requested file not present in registry: {:?}", fid));
+        };
 
         if let Some(grp) = app
             .file_handler

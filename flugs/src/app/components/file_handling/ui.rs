@@ -4,7 +4,7 @@ use egui::{text::LayoutJob, Color32, FontId};
 
 use crate::{
     app::{
-        events::{CopyFile, EventQueue, MoveFile, RemoveFile, RemoveGroup},
+        events::{CloneFile, CopyFile, EventQueue, MoveFile, RemoveFile, RemoveGroup},
         DynRequestSender,
     },
     EguiApp,
@@ -239,38 +239,59 @@ impl FileHandler {
                 })
         });
 
+        #[derive(PartialEq)]
+        enum FileAction {
+            Clone(usize),
+            Copy(usize),
+            Move(usize),
+        }
+
         // Menu to move/copy file to other group.
-        let mut target: (Option<usize>, bool) = (None, false);
+        let mut action: Option<FileAction> = None;
         egui::ComboBox::new((fid, "move"), "Move to Group").show_ui(ui, |ui| {
-            ui.selectable_value(&mut target, (None, false), "");
+            ui.selectable_value(&mut action, None, "");
             for (i, grp_name) in self.group_name_buffer.iter().enumerate().take(10) {
                 let label = if grp_name.is_empty() {
                     format!("<insert new at {}>", i)
                 } else {
                     format!("{} ({})", grp_name, i)
                 };
-                ui.selectable_value(&mut target, (Some(i), true), label);
+                ui.selectable_value(&mut action, Some(FileAction::Move(i)), label);
             }
         });
         egui::ComboBox::new((fid, "copy"), "Copy to Group").show_ui(ui, |ui| {
-            ui.selectable_value(&mut target, (None, false), "");
+            ui.selectable_value(&mut action, None, "");
             for (i, grp_name) in self.group_name_buffer.iter().enumerate().take(10) {
                 let label = if grp_name.is_empty() {
                     format!("<insert new at {}>", i)
                 } else {
                     format!("{} ({})", grp_name, i)
                 };
-                ui.selectable_value(&mut target, (Some(i), false), label);
+                ui.selectable_value(&mut action, Some(FileAction::Copy(i)), label);
             }
         });
-        match target {
-            (Some(target_gid), true) => {
+        egui::ComboBox::new((fid, "clone"), "Clone to Group").show_ui(ui, |ui| {
+            ui.selectable_value(&mut action, None, "");
+            for (i, grp_name) in self.group_name_buffer.iter().enumerate().take(10) {
+                let label = if grp_name.is_empty() {
+                    format!("<insert new at {}>", i)
+                } else {
+                    format!("{} ({})", grp_name, i)
+                };
+                ui.selectable_value(&mut action, Some(FileAction::Clone(i)), label);
+            }
+        });
+        match action {
+            Some(FileAction::Move(target_gid)) => {
                 event_queue.queue_event(Box::new(MoveFile::new(fid, gid, target_gid)))
             }
-            (Some(target_gid), false) => {
+            Some(FileAction::Copy(target_gid)) => {
                 event_queue.queue_event(Box::new(CopyFile::new(fid, target_gid)))
             }
-            (None, _) => (),
+            Some(FileAction::Clone(target_gid)) => {
+                event_queue.queue_event(Box::new(CloneFile::new(fid, target_gid)))
+            }
+            None => (),
         }
     }
 }

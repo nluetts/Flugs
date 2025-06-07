@@ -290,6 +290,12 @@ impl FileHandler {
         fid
     }
 
+    pub fn add_new_file(&mut self, file: File) -> FileID {
+        let fid = self.next_id();
+        self.registry.insert(fid, file);
+        fid
+    }
+
     fn fid_to_filename_str(&self, fid: &FileID) -> &str {
         self.registry
             .get(fid)

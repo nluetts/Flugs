@@ -47,3 +47,4 @@ BUGS:
 - [x] ~~Removing one file from group may may delete all files~~
 - [x] ~~CSV parsing can panic~~
 - [x] ~~spectral integration currently not working with OPUS files, probably because of the inversed x-axis~~
+- [ ] CSV module ignores last data row in CSV files?

@@ -578,12 +578,16 @@ impl Element for Text {
         let mut style = Vec::new();
         style.extend(self.style.iter().map(|(k, v)| (&k[..], &v[..])));
 
+        // Set default font to sans
+        let mut params = svg::opts(&style);
+        params.as_mut().map(|mut ps| {
+            if !ps.contains_key("font-family") {
+                ps.insert("font-family".to_string(), "sans".to_string());
+            };
+        });
+
         vec![Box::new(Tag::<svg::Text>::new(
-            x,
-            y,
-            self.angle,
-            &self.text,
-            svg::opts(&style),
+            x, y, self.angle, &self.text, params,
         ))]
     }
 
@@ -640,8 +644,8 @@ impl Element for Ticks {
             ("stroke-width", &width_param[..]),
         ];
         let style_minor = [("stroke", "lightgray"), ("stroke-width", &width_param[..])];
-        let style_xtick_label = [("text-anchor", "middle")];
-        let style_ytick_label = [("text-anchor", "end")];
+        let style_xtick_label = [("text-anchor", "middle"), ("font-family", "sans")];
+        let style_ytick_label = [("text-anchor", "end"), ("font-family", "sans")];
 
         let mut xticks: Vec<Box<dyn svg::RenderTag>> = Vec::new();
         let mut yticks: Vec<Box<dyn svg::RenderTag>> = Vec::new();

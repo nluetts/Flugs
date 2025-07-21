@@ -176,10 +176,17 @@ impl FileHandler {
             }
         };
 
-        ui.push_id(file.file_name(), |ui| {
+        let id = file.file_name().to_owned();
+        ui.push_id(id, |ui| {
             ui.horizontal(|ui| {
                 let label = egui::Label::new(file.file_name()).truncate();
-                ui.add(label);
+                ui.add(label).context_menu(|ui| {
+                    if ui.button("copy to alias").clicked() {
+                        if let Some(filename) = file.path.file_name() {
+                            file.properties.alias = filename.to_string_lossy().into_owned()
+                        }
+                    }
+                });
                 // Identifier and delete button.
                 ui.label(format!("(ID {})", fid.0));
                 if ui.small_button("🗑").clicked() {
@@ -300,6 +307,9 @@ impl File {
     pub fn render_property_settings(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             let label = ui.label("Alias: ");
+            if ui.small_button("shorten").clicked() {
+                self.shorten_alias('_');
+            }
             ui.text_edit_singleline(&mut self.properties.alias)
                 .labelled_by(label.id);
         });
@@ -329,6 +339,19 @@ impl File {
         egui::TextEdit::multiline(&mut self.properties.comment)
             .hint_text("Type a comment.")
             .show(ui);
+    }
+
+    fn shorten_alias(&mut self, delim: char) {
+        if let Some(shortened) = self
+            .properties
+            .alias
+            .rsplit_once(delim)
+            .iter()
+            .next()
+            .map(|(head, _rest)| *head)
+        {
+            self.properties.alias = shortened.to_owned();
+        }
     }
 }
 

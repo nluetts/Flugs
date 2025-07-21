@@ -165,7 +165,7 @@ impl AppEvent for CopyFile {
         } else {
             log::debug!("creating new group at slot {}", to_group);
             let mut grp = Group {
-                name: format!("Group {}", to_group),
+                name: format!("G{}", to_group),
                 ..Default::default()
             };
             grp.file_ids.push(fid);
@@ -200,7 +200,7 @@ impl AppEvent for CloneFile {
         } else {
             log::debug!("creating new group at slot {}", to_group);
             let mut grp = Group {
-                name: format!("Group {}", to_group),
+                name: format!("G{}", to_group),
                 ..Default::default()
             };
             grp.file_ids.push(fid);

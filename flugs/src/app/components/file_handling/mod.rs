@@ -52,8 +52,8 @@ pub struct FileProperties {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Annotation {
-    pub x: f64,
-    pub y: f64,
+    pub x: f32,
+    pub y: f32,
     pub text: String,
 }
 
@@ -145,7 +145,7 @@ impl Default for ActiveElement {
 }
 
 impl Annotation {
-    pub fn new(x: f64, y: f64, text: &str) -> Self {
+    pub fn new(x: f32, y: f32, text: &str) -> Self {
         Self {
             x,
             y,

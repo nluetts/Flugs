@@ -14,6 +14,7 @@ pub struct Plotter {
     selected_fid: Option<FileID>,
     current_plot_bounds: [f64; 4],
     current_integral: Option<(f64, f64)>,
+    current_annotation_text: String,
     integrate_with_local_baseline: bool,
     auto_shift_after_scaling: bool,
     request_plot_bounds: Option<[f64; 4]>,
@@ -27,6 +28,7 @@ impl Plotter {
             selected_fid: None,
             current_plot_bounds: [0.0, 0.0, 0.0, 0.0],
             current_integral: None,
+            current_annotation_text: String::new(),
             mode: PlotterMode::Display,
             // TODO: make this a global option
             integrate_with_local_baseline: true,
@@ -40,13 +42,15 @@ impl Plotter {
 pub enum PlotterMode {
     Display,
     Integrate,
+    Annotage,
 }
 
 impl PlotterMode {
     pub fn next(&mut self) -> Self {
         match self {
             PlotterMode::Display => PlotterMode::Integrate,
-            PlotterMode::Integrate => PlotterMode::Display,
+            PlotterMode::Integrate => PlotterMode::Annotage,
+            PlotterMode::Annotage => PlotterMode::Display,
         }
     }
 }

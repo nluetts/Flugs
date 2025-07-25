@@ -199,7 +199,7 @@ impl EguiApp {
     }
 
     fn menu(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        egui::menu::bar(ui, |ui| {
+        egui::MenuBar::new().ui(ui, |ui| {
             {
                 ui.menu_button("File", |ui| {
                     if ui.button("Save").clicked() {
@@ -258,6 +258,11 @@ impl EguiApp {
                         &mut self.plotter.mode,
                         crate::app::PlotterMode::Integrate,
                         "Integrate",
+                    );
+                    ui.selectable_value(
+                        &mut self.plotter.mode,
+                        crate::app::PlotterMode::Annotage,
+                        "Annotate",
                     );
                 });
 

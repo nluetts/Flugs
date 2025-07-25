@@ -1,7 +1,7 @@
-use egui::Vec2;
+use egui::{Context, Vec2};
 use egui_plot::{Legend, PlotBounds};
 
-use crate::app::components::{File, FileHandler, FileID};
+use crate::app::components::{file_handling::Annotation, File, FileHandler, FileID};
 
 impl super::Plotter {
     pub fn render(
@@ -55,6 +55,11 @@ impl super::Plotter {
                         plot_ui
                             .response()
                             .context_menu(|ui| self.integrate_menu(file_handler, ui));
+                    }
+                    super::PlotterMode::Annotage => {
+                        plot_ui
+                            .response()
+                            .context_menu(|ui| self.annotate_menu(file_handler, ctx, ui));
                     }
                 }
 
@@ -114,7 +119,6 @@ impl super::Plotter {
                     }
                 }
                 drag = plot_ui.pointer_coordinate_drag_delta();
-                let pos = plot_ui.pointer_coordinate();
                 spans = {
                     let bounds = plot_ui.plot_bounds();
                     let xspan = (bounds.max()[0] - bounds.min()[0]).abs();
@@ -129,7 +133,7 @@ impl super::Plotter {
 
                 // We need to "exfiltrate" the current plot bounds
                 // and whether the plot was clicked from this closure.
-                (plot_ui.plot_bounds(), plot_ui.response().clicked(), pos)
+                (plot_ui.plot_bounds(), plot_ui.response().clicked())
             });
 
         // Get modifier input (we need this here already, to disallow the plot
@@ -161,11 +165,9 @@ impl super::Plotter {
         {
             // `yspan` is needed to determine speed of y-scaling.
             let yspan = response.inner.0.height();
-            let mouse_pos = response.inner.2;
-            let should_modify =
-                modifier_down && (drag.length() > 0.0 || mouse_pos.is_some_and(|_| plot_clicked));
+            let should_modify = modifier_down && drag.length() > 0.0;
             if should_modify {
-                self.manipulate_file(selected_file, modifiers, drag, yspan, mouse_pos);
+                self.manipulate_file(selected_file, modifiers, drag, yspan);
             }
         }
     }
@@ -256,7 +258,7 @@ impl super::Plotter {
             for anno in file.properties.annotations.iter() {
                 plot_iu.add(egui_plot::Text::new(
                     "",
-                    [anno.x, anno.y].into(),
+                    [anno.x as f64, anno.y as f64].into(),
                     &anno.text,
                 ))
             }
@@ -372,6 +374,57 @@ impl super::Plotter {
             }
         } else if ui.button("New Region").clicked() {
             self.current_integral = Some((0.0, 0.0));
+        }
+    }
+    pub fn annotate_menu(
+        &mut self,
+        file_handler: &mut FileHandler,
+        ctx: &Context,
+        ui: &mut egui::Ui,
+    ) {
+        // New Label Ui
+        if let Some(file) = self
+            .selected_fid
+            .and_then(|id| file_handler.registry.get_mut(&id))
+        {
+            ui.label("New Label");
+            ui.text_edit_singleline(&mut self.current_annotation_text);
+            let Some(pos) = ctx.pointer_interact_pos() else {
+                return;
+            };
+            let [x, y] = pos.into();
+            if ui.button("Add Label").clicked() {
+                file.properties.annotations.push(Annotation::new(
+                    x,
+                    y,
+                    &self.current_annotation_text,
+                ));
+                return;
+            }
+
+            // Edit/Remove Label Ui
+            if let Some((idx, annotation)) =
+                // Select the closest annotation
+                file.properties.annotations.iter_mut().enumerate().reduce(
+                        |(i, a), (j, b)| {
+                            let dist_a = ((a.x - x).powi(2) + (a.y - y).powi(2)).sqrt();
+                            let dist_b = ((b.x - x).powi(2) + (b.y - y).powi(2)).sqrt();
+                            if dist_a < dist_b {
+                                (i, a)
+                            } else {
+                                (j, b)
+                            }
+                        },
+                    )
+            {
+                ui.label("Remove/Edit Annotation");
+                ui.text_edit_singleline(&mut annotation.text);
+                if ui.button("Remove").clicked() {
+                    file.properties.annotations.remove(idx);
+                }
+            }
+        } else {
+            ui.label("Select a plot to add annotations.");
         }
     }
 }

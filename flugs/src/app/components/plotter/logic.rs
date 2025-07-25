@@ -1,12 +1,8 @@
 use std::io::Write;
 
 use egui::Vec2;
-use egui_plot::PlotPoint;
 
-use crate::{
-    app::components::{file_handling::Annotation, File},
-    EguiApp,
-};
+use crate::{app::components::File, EguiApp};
 
 impl super::Plotter {
     pub(super) fn manipulate_file(
@@ -15,7 +11,6 @@ impl super::Plotter {
         modifiers: [bool; 3],
         drag: Vec2,
         yspan: f64,
-        mouse_pos: Option<PlotPoint>,
     ) {
         // How much did the mouse move?
         let Vec2 { x: dx, y: dy } = drag;
@@ -32,16 +27,6 @@ impl super::Plotter {
             [false, false, true] => {
                 let yscale = active_file.properties.yscale;
                 active_file.properties.yscale += yscale * 3.0 / yspan * (dy as f64);
-            }
-            // Ctrl and Shift is pressed → insert annotation.
-            [false, true, true] => {
-                if let Some(mouse_pos) = mouse_pos {
-                    active_file.properties.annotations.push(Annotation::new(
-                        mouse_pos.x,
-                        mouse_pos.y,
-                        "foobar",
-                    ));
-                }
             }
             // If several modifiers are pressed at the same time,
             // we ignore the input.

@@ -27,10 +27,7 @@ impl super::Plotter {
         self.files_plot_ids.drain();
         let response = egui_plot::Plot::new("Plot")
             .allow_drag(allow_drag)
-            .auto_bounds(egui::Vec2b {
-                x: auto_bounds,
-                y: auto_bounds,
-            })
+            .auto_bounds([auto_bounds, auto_bounds])
             .legend(Legend::default())
             .show(ui, |plot_ui| {
                 if let Some(bounds) = self.request_plot_bounds.take() {
@@ -66,7 +63,7 @@ impl super::Plotter {
                     if let Some((xmin, xmax)) = self.current_integral {
                         let y = plot_ui.plot_bounds().center().y;
                         plot_ui.line(
-                            egui_plot::Line::new(vec![[xmin, y], [xmax, y]])
+                            egui_plot::Line::new("".to_string(), vec![[xmin, y], [xmax, y]])
                                 .color(egui::Color32::RED)
                                 .width(3.0),
                         );
@@ -117,6 +114,7 @@ impl super::Plotter {
                     }
                 }
                 drag = plot_ui.pointer_coordinate_drag_delta();
+                let pos = plot_ui.pointer_coordinate();
                 spans = {
                     let bounds = plot_ui.plot_bounds();
                     let xspan = (bounds.max()[0] - bounds.min()[0]).abs();
@@ -131,7 +129,7 @@ impl super::Plotter {
 
                 // We need to "exfiltrate" the current plot bounds
                 // and whether the plot was clicked from this closure.
-                (plot_ui.plot_bounds(), plot_ui.response().clicked())
+                (plot_ui.plot_bounds(), plot_ui.response().clicked(), pos)
             });
 
         // Get modifier input (we need this here already, to disallow the plot
@@ -163,19 +161,21 @@ impl super::Plotter {
         {
             // `yspan` is needed to determine speed of y-scaling.
             let yspan = response.inner.0.height();
-            let should_modify = modifier_down && drag.length() > 0.0;
+            let mouse_pos = response.inner.2;
+            let should_modify =
+                modifier_down && (drag.length() > 0.0 || mouse_pos.is_some_and(|_| plot_clicked));
             if should_modify {
-                self.manipulate_file(selected_file, modifiers, drag, yspan);
+                self.manipulate_file(selected_file, modifiers, drag, yspan, mouse_pos);
             }
         }
     }
 
-    fn plot(
+    fn plot<'a>(
         &self,
         fid: &FileID,
         file: &File,
         group_name: &str,
-        plot_iu: &mut egui_plot::PlotUi,
+        plot_iu: &mut egui_plot::PlotUi<'a>,
     ) -> egui::Id {
         if let Some(data) = file.get_cache() {
             let ymin = data
@@ -212,7 +212,7 @@ impl super::Plotter {
             };
             let egui_id = name.clone().into();
             plot_iu.line(
-                egui_plot::Line::new(data.to_owned())
+                egui_plot::Line::new("".to_string(), data.to_owned())
                     .color(color)
                     .width(width)
                     .name(name)
@@ -245,7 +245,7 @@ impl super::Plotter {
                         plot_data.extend(line_data);
                     }
                     plot_iu.line(
-                        egui_plot::Line::new(plot_data)
+                        egui_plot::Line::new("".to_string(), plot_data)
                             .color(egui::Color32::WHITE)
                             .width(width)
                             .id(egui_id),
@@ -253,9 +253,17 @@ impl super::Plotter {
                 }
             }
 
+            for anno in file.properties.annotations.iter() {
+                plot_iu.add(egui_plot::Text::new(
+                    "",
+                    [anno.x, anno.y].into(),
+                    &anno.text,
+                ))
+            }
+
             egui_id
         } else {
-            // This should never happen because if the filter applied in
+            // This should never happen because of the filter applied in
             // `Plotter::render`.
             unreachable!(
                 "unable to get cache for plotting for file '{}'",
@@ -375,7 +383,7 @@ pub fn auto_color(color_idx: i32) -> egui::Color32 {
     egui::epaint::Hsva::new(h, 0.85, 0.5, 1.0).into()
 }
 
-fn pointer_inside_plot(plot_ui: &egui_plot::PlotUi) -> bool {
+fn pointer_inside_plot<'a>(plot_ui: &egui_plot::PlotUi<'a>) -> bool {
     if let Some(pointer_position) = plot_ui.pointer_coordinate() {
         return plot_ui
             .plot_bounds()

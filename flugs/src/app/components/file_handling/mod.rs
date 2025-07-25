@@ -34,12 +34,27 @@ pub struct File {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FileProperties {
+    #[serde(default)]
     pub alias: String,
+    #[serde(default)]
     pub xoffset: f64,
+    #[serde(default)]
     pub yoffset: f64,
+    #[serde(default)]
     pub yscale: f64,
+    #[serde(default)]
     pub color: Option<Color32>,
+    #[serde(default)]
     pub comment: String,
+    #[serde(default)]
+    pub annotations: Vec<Annotation>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Annotation {
+    pub x: f64,
+    pub y: f64,
+    pub text: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -102,6 +117,7 @@ impl Default for FileProperties {
             yscale: 1.0,
             color: None,
             comment: String::new(),
+            annotations: Vec::new(),
         }
     }
 }
@@ -125,5 +141,15 @@ impl Default for Group {
 impl Default for ActiveElement {
     fn default() -> Self {
         Self::Group(0)
+    }
+}
+
+impl Annotation {
+    pub fn new(x: f64, y: f64, text: &str) -> Self {
+        Self {
+            x,
+            y,
+            text: text.to_string(),
+        }
     }
 }

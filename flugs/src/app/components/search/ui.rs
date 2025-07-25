@@ -254,7 +254,10 @@ fn match_hover_ui(
                 .view_aspect(4.0 / 3.0)
                 .show_axes(false)
                 .show(ui, |plot_ui| {
-                    plot_ui.line(egui_plot::Line::new(csv_data.get_cache().data.to_owned()));
+                    plot_ui.line(egui_plot::Line::new(
+                        "".to_string(),
+                        csv_data.get_cache().data.to_owned(),
+                    ));
                 });
             *cursor = egui::CursorIcon::PointingHand;
         }

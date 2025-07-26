@@ -1,7 +1,7 @@
 use egui::{Context, Vec2};
 use egui_plot::{Legend, PlotBounds};
 
-use crate::app::components::{file_handling::Annotation, File, FileHandler, FileID};
+use crate::app::components::{File, FileHandler, FileID};
 
 impl super::Plotter {
     pub fn render(
@@ -57,9 +57,9 @@ impl super::Plotter {
                             .context_menu(|ui| self.integrate_menu(file_handler, ui));
                     }
                     super::PlotterMode::Annotage => {
-                        plot_ui
-                            .response()
-                            .context_menu(|ui| self.annotate_menu(file_handler, ctx, ui));
+                        // plot_ui
+                        //     .response()
+                        //     .context_menu(|ui| self.annotate_menu(file_handler, ctx, ui));
                     }
                 }
 
@@ -388,17 +388,21 @@ impl super::Plotter {
             .and_then(|id| file_handler.registry.get_mut(&id))
         {
             ui.label("New Label");
-            ui.text_edit_singleline(&mut self.current_annotation_text);
-            let Some(pos) = ctx.pointer_interact_pos() else {
-                return;
-            };
-            let [x, y] = pos.into();
+            ui.text_edit_singleline(&mut self.current_annotation.text);
+            if let Some(pos) = ctx.pointer_interact_pos() {
+                self.current_annotation.x = pos.x;
+                self.current_annotation.y = pos.y;
+            }
+            ui.horizontal(|ui| {
+                ui.label("x");
+                ui.add(egui::DragValue::new(&mut self.current_annotation.x).speed(0.0));
+                ui.label("y");
+                ui.add(egui::DragValue::new(&mut self.current_annotation.y).speed(0.0));
+            });
             if ui.button("Add Label").clicked() {
-                file.properties.annotations.push(Annotation::new(
-                    x,
-                    y,
-                    &self.current_annotation_text,
-                ));
+                file.properties
+                    .annotations
+                    .push(self.current_annotation.clone());
                 return;
             }
 
@@ -407,8 +411,12 @@ impl super::Plotter {
                 // Select the closest annotation
                 file.properties.annotations.iter_mut().enumerate().reduce(
                         |(i, a), (j, b)| {
-                            let dist_a = ((a.x - x).powi(2) + (a.y - y).powi(2)).sqrt();
-                            let dist_b = ((b.x - x).powi(2) + (b.y - y).powi(2)).sqrt();
+                            let dist_a = ((a.x - self.current_annotation.x).powi(2)
+                                + (a.y - self.current_annotation.y).powi(2))
+                            .sqrt();
+                            let dist_b = ((b.x - self.current_annotation.x).powi(2)
+                                + (b.y - self.current_annotation.y).powi(2))
+                            .sqrt();
                             if dist_a < dist_b {
                                 (i, a)
                             } else {

@@ -50,7 +50,7 @@ pub struct FileProperties {
     pub annotations: Vec<Annotation>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Annotation {
     pub x: f32,
     pub y: f32,
@@ -141,15 +141,5 @@ impl Default for Group {
 impl Default for ActiveElement {
     fn default() -> Self {
         Self::Group(0)
-    }
-}
-
-impl Annotation {
-    pub fn new(x: f32, y: f32, text: &str) -> Self {
-        Self {
-            x,
-            y,
-            text: text.to_string(),
-        }
     }
 }

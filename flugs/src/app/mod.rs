@@ -199,7 +199,7 @@ impl EguiApp {
     }
 
     fn menu(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        egui::MenuBar::new().ui(ui, |ui| {
+        egui::menu::bar(ui, |ui| {
             {
                 ui.menu_button("File", |ui| {
                     if ui.button("Save").clicked() {

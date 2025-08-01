@@ -1,4 +1,4 @@
-use egui::{Context, Vec2};
+use egui::Vec2;
 use egui_plot::{Legend, PlotBounds};
 
 use crate::app::components::{File, FileHandler, FileID};
@@ -21,13 +21,12 @@ impl super::Plotter {
         let mut spans = (0.0, 0.0);
         let mut drag = Vec2::default();
 
-        let auto_bounds = self.mode == super::PlotterMode::Display;
-        let allow_drag = self.selected_fid.is_none() && self.mode == super::PlotterMode::Display;
+        let allow_drag = self.selected_fid.is_none() && self.mode != super::PlotterMode::Integrate;
 
         self.files_plot_ids.drain();
         let response = egui_plot::Plot::new("Plot")
             .allow_drag(allow_drag)
-            .auto_bounds([auto_bounds, auto_bounds])
+            .auto_bounds([true, true])
             .legend(Legend::default())
             .show(ui, |plot_ui| {
                 if let Some(bounds) = self.request_plot_bounds.take() {
@@ -57,9 +56,15 @@ impl super::Plotter {
                             .context_menu(|ui| self.integrate_menu(file_handler, ui));
                     }
                     super::PlotterMode::Annotage => {
-                        // plot_ui
-                        //     .response()
-                        //     .context_menu(|ui| self.annotate_menu(file_handler, ctx, ui));
+                        let resp = plot_ui.response();
+                        if resp.secondary_clicked() {
+                            if let Some(pos) = ctx.input(|i| i.pointer.latest_pos()) {
+                                let [x, y] = plot_ui.plot_from_screen(pos).to_vec2().into();
+                                self.current_annotation.x = x;
+                                self.current_annotation.y = y;
+                            }
+                        }
+                        resp.context_menu(|ui| self.annotate_menu(file_handler, ui));
                     }
                 }
 
@@ -256,10 +261,12 @@ impl super::Plotter {
             }
 
             for anno in file.properties.annotations.iter() {
+                let txt = egui::RichText::new(&anno.text);
                 plot_iu.add(egui_plot::Text::new(
                     "",
                     [anno.x as f64, anno.y as f64].into(),
-                    &anno.text,
+                    // TODO: make this a global option
+                    txt.size(14.0),
                 ))
             }
 
@@ -376,12 +383,8 @@ impl super::Plotter {
             self.current_integral = Some((0.0, 0.0));
         }
     }
-    pub fn annotate_menu(
-        &mut self,
-        file_handler: &mut FileHandler,
-        ctx: &Context,
-        ui: &mut egui::Ui,
-    ) {
+    pub fn annotate_menu(&mut self, file_handler: &mut FileHandler, ui: &mut egui::Ui) {
+        ui.heading("Edit annotations");
         // New Label Ui
         if let Some(file) = self
             .selected_fid
@@ -389,10 +392,7 @@ impl super::Plotter {
         {
             ui.label("New Label");
             ui.text_edit_singleline(&mut self.current_annotation.text);
-            if let Some(pos) = ctx.pointer_interact_pos() {
-                self.current_annotation.x = pos.x;
-                self.current_annotation.y = pos.y;
-            }
+
             ui.horizontal(|ui| {
                 ui.label("x");
                 ui.add(egui::DragValue::new(&mut self.current_annotation.x).speed(0.0));

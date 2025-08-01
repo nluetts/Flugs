@@ -248,7 +248,15 @@ impl EguiApp {
                     );
                 });
 
-                ui.menu_button("Mode", |ui| {
+                let mode_button_label = format!(
+                    "Mode ({})",
+                    match self.plotter.mode {
+                        PlotterMode::Display => "D",
+                        PlotterMode::Integrate => "I",
+                        PlotterMode::Annotage => "A",
+                    },
+                );
+                ui.menu_button(mode_button_label, |ui| {
                     ui.selectable_value(
                         &mut self.plotter.mode,
                         crate::app::PlotterMode::Display,

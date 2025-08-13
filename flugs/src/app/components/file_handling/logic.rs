@@ -48,12 +48,11 @@ impl File {
             self.file_name()
         );
 
-        // TODO: in the end we want to have the columns to be selectable.
-        let Some(xs) = data.columns.first() else {
+        let Some(xs) = data.columns.get(self.properties.selected_x_column) else {
             log::error!("{msg}");
             return f64::NAN;
         };
-        let Some(ys) = data.columns.get(1) else {
+        let Some(ys) = data.columns.get(self.properties.selected_y_column) else {
             log::error!("{msg}");
             return f64::NAN;
         };
@@ -99,12 +98,11 @@ impl File {
             self.file_name()
         );
 
-        // TODO: in the end we want to have the columns to be selectable.
-        let Some(xs) = data.columns.first() else {
+        let Some(xs) = data.columns.get(self.properties.selected_x_column) else {
             log::error!("{msg}");
             return f64::NAN;
         };
-        let Some(ys) = data.columns.get(1) else {
+        let Some(ys) = data.columns.get(self.properties.selected_y_column) else {
             log::error!("{msg}");
             return f64::NAN;
         };

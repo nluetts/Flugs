@@ -180,13 +180,17 @@ impl FileHandler {
         ui.push_id(id, |ui| {
             ui.horizontal(|ui| {
                 let label = egui::Label::new(file.file_name()).truncate();
-                ui.add(label).context_menu(|ui| {
-                    if ui.button("copy to alias").clicked() {
-                        if let Some(filename) = file.path.file_name() {
-                            file.properties.alias = filename.to_string_lossy().into_owned()
+                ui.add(label)
+                    .on_hover_ui(|ui| {
+                        ui.label("right click to copy file name to alias");
+                    })
+                    .context_menu(|ui| {
+                        if ui.button("copy to alias").clicked() {
+                            if let Some(filename) = file.path.file_name() {
+                                file.properties.alias = filename.to_string_lossy().into_owned()
+                            }
                         }
-                    }
-                });
+                    });
                 // Identifier and delete button.
                 ui.label(format!("(ID {})", fid.0));
                 if ui.small_button("🗑").clicked() {
@@ -194,8 +198,6 @@ impl FileHandler {
                 }
             })
         });
-
-        ui.separator();
 
         // Display error if csv could not be parsed.
         if let Err(error) = file.data.value() {
@@ -205,6 +207,7 @@ impl FileHandler {
         file.render_property_settings(ui);
 
         ui.separator();
+        ui.heading("Preview File Contents");
 
         egui::CollapsingHeader::new("Metadata Header").show(ui, |ui| {
             egui::ScrollArea::new([true, true])
@@ -225,7 +228,7 @@ impl FileHandler {
                 })
         });
 
-        egui::CollapsingHeader::new("Contents").show(ui, |ui| {
+        egui::CollapsingHeader::new("Data").show(ui, |ui| {
             egui::ScrollArea::new([true, true])
                 .max_height(300.0)
                 .max_width(800.0)
@@ -245,6 +248,9 @@ impl FileHandler {
                     }
                 })
         });
+
+        ui.separator();
+        ui.heading("Move/Copy/Clone to other Groups");
 
         #[derive(PartialEq)]
         enum FileAction {
@@ -314,6 +320,41 @@ impl File {
                 .labelled_by(label.id);
         });
 
+        ui.separator();
+        // Select which columns to plot
+        let select_x_column = egui::DragValue::new(&mut self.properties.selected_x_column).range(
+            0..=self
+                .data
+                .value()
+                .as_ref()
+                .map(|data| data.columns.len() - 1)
+                .unwrap_or_default(),
+        );
+        let select_y_column = egui::DragValue::new(&mut self.properties.selected_y_column).range(
+            0..=self
+                .data
+                .value()
+                .as_ref()
+                .map(|data| data.columns.len() - 1)
+                .unwrap_or_default(),
+        );
+        let mut x_changed = false;
+        let mut y_changed = false;
+        ui.horizontal(|ui| {
+            ui.label("X and Y column to plot: ");
+            x_changed = ui.add(select_x_column).changed();
+            y_changed = ui.add(select_y_column).changed();
+        });
+        if x_changed || y_changed {
+            if let Ok(val) = self.data.value_mut() {
+                val.regenerate_cache(
+                    self.properties.selected_x_column,
+                    self.properties.selected_y_column,
+                );
+            }
+        };
+
+        ui.separator();
         ui.label("X-Offset: ");
         let dragv = egui::DragValue::new(&mut self.properties.xoffset);
         ui.add(dragv);
@@ -323,6 +364,8 @@ impl File {
         ui.label("Y-Scale: ");
         let dragv = egui::DragValue::new(&mut self.properties.yscale);
         ui.add(dragv);
+
+        ui.separator();
         ui.horizontal(|ui| {
             ui.label("Custom Color: ");
             if let Some(color) = self.properties.color.as_mut() {

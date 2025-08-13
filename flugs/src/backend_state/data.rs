@@ -71,10 +71,15 @@ impl PlotData {
         &self.cache
     }
 
-    pub fn ymin(&self) -> Option<f64> {
-        // TODO: This has to be changed when columns are selectable.
+    pub fn regenerate_cache(&mut self, x_col: usize, y_col: usize) {
+        if let Some(cache) = PlotCache::new(&self.columns, Some(x_col), y_col) {
+            self.cache = cache;
+        }
+    }
+
+    pub fn ymin(&self, ycol: usize) -> Option<f64> {
         self.columns
-            .get(1)
+            .get(ycol)
             .and_then(|ys| ys.iter().reduce(|a, b| if a < b { a } else { b }))
             .copied()
     }

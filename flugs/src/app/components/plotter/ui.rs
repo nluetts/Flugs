@@ -365,7 +365,9 @@ impl super::Plotter {
                                 if self.auto_shift_after_scaling {
                                     let offset = file.local_minimum(*a, *b, false);
                                     let ymin = match file.data.value() {
-                                        Ok(data) => data.ymin().unwrap_or_default(),
+                                        Ok(data) => data
+                                            .ymin(file.properties.selected_y_column)
+                                            .unwrap_or_default(),
                                         Err(_) => 0.0,
                                     };
                                     // Because we add/subtract ymin from the

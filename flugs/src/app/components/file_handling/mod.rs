@@ -48,6 +48,16 @@ pub struct FileProperties {
     pub comment: String,
     #[serde(default)]
     pub annotations: Vec<Annotation>,
+    #[serde(default)]
+    pub selected_x_column: usize,
+    // Seems serde only allows function calls for generating
+    // default values other than Default::default()
+    #[serde(default = "serde_default_usize_1")]
+    pub selected_y_column: usize,
+}
+
+fn serde_default_usize_1() -> usize {
+    1
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -118,6 +128,8 @@ impl Default for FileProperties {
             color: None,
             comment: String::new(),
             annotations: Vec::new(),
+            selected_x_column: 0,
+            selected_y_column: 1,
         }
     }
 }

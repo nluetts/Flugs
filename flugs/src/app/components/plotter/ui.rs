@@ -47,6 +47,10 @@ impl super::Plotter {
                             plot_ui
                                 .response()
                                 .context_menu(|ui| file.render_property_settings(ui));
+                        } else {
+                            plot_ui
+                                .response()
+                                .context_menu(|ui| self.display_menu(file_handler, ui));
                         }
                     }
                     // In integrate mode, we show the integrate menu.
@@ -278,6 +282,26 @@ impl super::Plotter {
                 "unable to get cache for plotting for file '{}'",
                 file.file_name()
             )
+        }
+    }
+
+    pub fn display_menu(&mut self, file_handler: &mut FileHandler, ui: &mut egui::Ui) {
+        ui.set_min_width(200.0);
+        if ui.button("Reset all").clicked() {
+            for fid in file_handler
+                // Get IDs of all currently plotted files.
+                .groups
+                .iter()
+                .filter_map(|g| g.as_ref().filter(|g| g.is_plotted))
+                .flat_map(|g| g.file_ids.iter())
+            {
+                if let Some(file) = file_handler.registry.get_mut(fid) {
+                    // Reset all offsets and scaling.
+                    file.properties.xoffset = 0.0;
+                    file.properties.yoffset = 0.0;
+                    file.properties.yscale = 1.0;
+                };
+            }
         }
     }
 

@@ -364,6 +364,11 @@ impl File {
         ui.label("Y-Scale: ");
         let dragv = egui::DragValue::new(&mut self.properties.yscale);
         ui.add(dragv);
+        if ui.button("Reset offset/scaling").clicked() {
+            self.properties.xoffset = 0.0;
+            self.properties.yoffset = 0.0;
+            self.properties.yscale = 1.0;
+        }
 
         ui.separator();
         ui.horizontal(|ui| {

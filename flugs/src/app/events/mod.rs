@@ -129,6 +129,11 @@ pub struct SavePlotRequested {
     thread_handle: Option<JoinHandle<Option<PathBuf>>>,
 }
 
+#[derive(new)]
+pub struct ConsolidateRequest {
+    thread_handle: Option<JoinHandle<Option<PathBuf>>>,
+}
+
 // ---------------------------------------------------------------------------
 //
 //
@@ -275,6 +280,27 @@ impl AppEvent for SavePlotRequested {
                 Ok(None) => (),
                 Err(err) => {
                     log::error!("unable to save plot: {:?}", err)
+                }
+            };
+            Ok(EventState::Finished)
+        } else {
+            Ok(EventState::Busy)
+        }
+    }
+}
+
+impl AppEvent for ConsolidateRequest {
+    type App = EguiApp;
+
+    fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
+        if let Some(handle) = self.thread_handle.take_if(|handle| handle.is_finished()) {
+            match handle.join() {
+                Ok(Some(path)) => {
+                    app.file_handler.consolidate_files(&path);
+                }
+                Ok(None) => (),
+                Err(err) => {
+                    log::error!("Unable to consolidate files: {:?}", err)
                 }
             };
             Ok(EventState::Finished)

@@ -4,6 +4,7 @@ mod events;
 pub mod storage;
 
 use self::components::{Plotter, Search};
+use crate::app::events::ConsolidateRequest;
 use crate::app::events::EventQueue;
 use crate::BackendAppState;
 use app_core::backend::BackendRequest;
@@ -232,6 +233,12 @@ impl EguiApp {
                     };
                     if ui.button("Reset Session").clicked() {
                         self.reset_state();
+                    };
+                    if ui.button("Consolidate Files").clicked() {
+                        log::debug!("open dialog to select consolidation path");
+                        let handle = std::thread::spawn(|| rfd::FileDialog::new().pick_folder());
+                        let event = ConsolidateRequest::new(Some(handle));
+                        self.event_queue.queue_event(Box::new(event));
                     };
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);

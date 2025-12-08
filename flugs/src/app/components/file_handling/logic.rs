@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use app_core::{
     backend::{BackendEventLoop, BackendLink, LinkReceiver},
@@ -307,6 +307,24 @@ impl FileHandler {
             was_updated = was_updated || file.data.try_update();
         }
         was_updated
+    }
+
+    pub fn consolidate_files(&self, path: &Path) {
+        let unique_paths: HashSet<_> = self
+            .registry
+            .values()
+            .map(|file| file.path.to_owned())
+            .collect();
+
+        for fp in unique_paths {
+            let Some(file_name) = fp.file_name() else {
+                log::warn!("{fp:?} does not contain valid file name, skipping");
+                continue;
+            };
+            if let Err(e) = std::fs::copy(&fp, path.join(file_name)) {
+                log::error!("Error when trying to copy {:?}: {e}", fp);
+            }
+        }
     }
 }
 

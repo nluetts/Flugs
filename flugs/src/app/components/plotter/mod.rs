@@ -54,3 +54,12 @@ impl PlotterMode {
         }
     }
 }
+
+fn global_ymin(data: &Vec<[f64; 2]>) -> f64 {
+    let ymin = data
+        .iter()
+        .map(|[_, y]| *y)
+        .reduce(|current_min, yi| if yi < current_min { yi } else { current_min })
+        .unwrap_or(0.0);
+    ymin
+}

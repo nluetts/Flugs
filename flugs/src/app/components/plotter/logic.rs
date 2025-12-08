@@ -1,6 +1,7 @@
 use std::io::Write;
 
 use egui::Vec2;
+use egui_plot::PlotBounds;
 
 use crate::{app::components::File, EguiApp};
 
@@ -10,10 +11,11 @@ impl super::Plotter {
         active_file: &mut File,
         modifiers: [bool; 3],
         drag: Vec2,
-        yspan: f64,
+        bounds: PlotBounds,
     ) {
         // How much did the mouse move?
         let Vec2 { x: dx, y: dy } = drag;
+        let yspan = bounds.height();
         match modifiers {
             // Alt key is pressed → change xoffset.
             [true, false, false] => {
@@ -25,8 +27,58 @@ impl super::Plotter {
             }
             // Shift is pressed → change yscale.
             [false, false, true] => {
-                let yscale = active_file.properties.yscale;
-                active_file.properties.yscale += yscale * 3.0 / yspan * (dy as f64);
+                let yscale_old = active_file.properties.yscale;
+                // Find index of point with minimum y-value that falls within
+                // plot bounds
+                let (mut xmin, mut ymin) = (f64::NAN, f64::INFINITY);
+                let (mut xmax, mut ymax) = (f64::NAN, -f64::INFINITY);
+                for [x, y] in active_file
+                    .data
+                    .value()
+                    .as_ref()
+                    .ok()
+                    .map(|data| &data.get_cache().data)
+                    .into_iter()
+                    .flatten()
+                {
+                    if bounds.range_x().contains(x) && *y < ymin {
+                        xmin = *x;
+                        ymin = *y;
+                    }
+                    if bounds.range_x().contains(x) && *y > ymax {
+                        xmax = *x;
+                        ymax = *y;
+                    }
+                }
+                // To keep the minimal y-value in current plot bounds at the
+                // same position, consider:
+                // y = m * (ymin - global_ymin) + b
+                // y' = m' * (ymin - global_ymin) + b'
+                // m * (ymin - global_ymin) + b = m' * (ymin - global_ymin) + b'
+                // b' = (ymin - global_ymin) * (m - m') + b
+                // (y = scaled y-value, m = yscale, b = yoffset, prime = new values)
+                let global_ymin = active_file
+                    .data
+                    .value()
+                    .as_ref()
+                    .ok()
+                    .map(|data| super::global_ymin(&data.get_cache().data))
+                    .unwrap_or_default();
+                if !xmax.is_nan() && !xmin.is_nan() {
+                    let yoffset_old = active_file.properties.yoffset;
+                    // New scaling and offset
+                    active_file.properties.yscale += yscale_old * 3.0 / yspan * (dy as f64);
+                    active_file.properties.yoffset = (ymin - global_ymin)
+                        * (yscale_old - active_file.properties.yscale)
+                        + yoffset_old;
+                    log::debug!(
+                        "xmin: {xmin}, ymin: {}, bounds: {bounds:?}",
+                        ymin * active_file.properties.yscale + active_file.properties.yoffset
+                    );
+                } else {
+                    let yspan = bounds.height();
+                    active_file.properties.yscale += yscale_old * 3.0 / yspan * (dy as f64);
+                }
             }
             // If several modifiers are pressed at the same time,
             // we ignore the input.

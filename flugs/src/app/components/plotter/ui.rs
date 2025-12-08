@@ -172,11 +172,10 @@ impl super::Plotter {
             .selected_fid
             .and_then(|fid| file_handler.registry.get_mut(&fid))
         {
-            // `yspan` is needed to determine speed of y-scaling.
-            let yspan = response.inner.0.height();
+            let bounds = response.inner.0;
             let should_modify = modifier_down && drag.length() > 0.0;
             if should_modify {
-                self.manipulate_file(selected_file, modifiers, drag, yspan);
+                self.manipulate_file(selected_file, modifiers, drag, bounds);
             }
         }
     }
@@ -189,11 +188,7 @@ impl super::Plotter {
         plot_iu: &mut egui_plot::PlotUi<'a>,
     ) -> egui::Id {
         if let Some(data) = file.get_cache() {
-            let ymin = data
-                .iter()
-                .map(|[_, y]| y)
-                .reduce(|current_min, yi| if yi < current_min { yi } else { current_min })
-                .unwrap_or(&0.0);
+            let ymin = super::global_ymin(data);
             // Apply custom shifting/scaling to data.
             let data: Vec<[f64; 2]> = data
                 .iter()

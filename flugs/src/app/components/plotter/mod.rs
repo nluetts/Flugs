@@ -18,6 +18,7 @@ pub struct Plotter {
     integrate_with_local_baseline: bool,
     auto_shift_after_scaling: bool,
     request_plot_bounds: Option<[f64; 4]>,
+    space: f64,
     pub mode: PlotterMode,
 }
 
@@ -34,6 +35,7 @@ impl Plotter {
             integrate_with_local_baseline: true,
             request_plot_bounds: None,
             auto_shift_after_scaling: false,
+            space: 0.0,
         }
     }
 }
@@ -53,13 +55,4 @@ impl PlotterMode {
             PlotterMode::Annotage => PlotterMode::Display,
         }
     }
-}
-
-fn global_ymin(data: &Vec<[f64; 2]>) -> f64 {
-    let ymin = data
-        .iter()
-        .map(|[_, y]| *y)
-        .reduce(|current_min, yi| if yi < current_min { yi } else { current_min })
-        .unwrap_or(0.0);
-    ymin
 }

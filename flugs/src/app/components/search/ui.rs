@@ -5,6 +5,7 @@ use std::{
 
 use app_core::frontend::UIParameter;
 use egui::{text::LayoutJob, Color32, FontId, InputState, Label, Pos2, TextFormat};
+use egui_plot::PlotPoints;
 
 use crate::{app::DynRequestSender, backend_state::PlotData};
 
@@ -256,7 +257,7 @@ fn match_hover_ui(
                 .show(ui, |plot_ui| {
                     plot_ui.line(egui_plot::Line::new(
                         "".to_string(),
-                        csv_data.get_cache().data.to_owned(),
+                        PlotPoints::Borrowed(&csv_data.get_cache().data),
                     ));
                 });
             *cursor = egui::CursorIcon::PointingHand;

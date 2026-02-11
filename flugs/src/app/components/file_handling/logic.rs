@@ -5,6 +5,7 @@ use app_core::{
     frontend::UIParameter,
     BACKEND_HUNG_UP_MSG,
 };
+use egui_plot::PlotPoint;
 
 use crate::{
     app::{
@@ -21,7 +22,7 @@ use crate::{
 use super::{File, FileHandler, FileID, Group};
 
 impl File {
-    pub fn get_cache(&self) -> Option<&Vec<[f64; 2]>> {
+    pub fn get_cache(&self) -> Option<&Vec<PlotPoint>> {
         self.data
             .value()
             .as_ref()

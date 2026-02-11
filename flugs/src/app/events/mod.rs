@@ -149,6 +149,14 @@ pub struct LocateFile {
     search_dispatched: bool,
 }
 
+/// Subtract a file from another file
+#[derive(new)]
+pub struct SubtractFile {
+    // minuend − subtrahend = difference
+    minuend: FileID,
+    subtrahend: FileID,
+}
+
 // ---------------------------------------------------------------------------
 //
 //
@@ -360,6 +368,68 @@ impl AppEvent for LocateFile {
             }
             None => *fdata = Err(format!("File not found in current search path!")),
         }
+        Ok(EventState::Finished)
+    }
+}
+
+impl AppEvent for SubtractFile {
+    type App = EguiApp;
+
+    fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
+        log::debug!(
+            "Subtracting file with ID {:?} from {:?}",
+            &self.subtrahend,
+            &self.minuend
+        );
+        let [Some(minuend), Some(subtrahend)] = app
+            .file_handler
+            .registry
+            .get_disjoint_mut([&self.minuend, &self.subtrahend])
+        else {
+            return Err(format!(
+                "Could not retrieve files with IDs {:?} and {:?} for subtraction",
+                &self.minuend, self.subtrahend
+            ));
+        };
+
+        let Ok(minuend_cache) = minuend.data.value_mut().as_mut().and_then(|data| {
+            // We have to reset the cache so we do not subtract other files
+            // several times.
+            data.regenerate_cache(
+                minuend.properties.selected_x_column,
+                minuend.properties.selected_y_column,
+                minuend.properties.xoffset,
+                minuend.properties.yoffset,
+                minuend.properties.yscale,
+            );
+            Ok(data.get_cache_mut())
+        }) else {
+            return Err(format!(
+                "Could not retrieve cache for file {:?} (minuend in subtraction)",
+                minuend.file_name()
+            ));
+        };
+
+        let Ok(subtrahend_cache) = subtrahend
+            .data
+            .value()
+            .as_ref()
+            .and_then(|data| Ok(data.get_cache()))
+        else {
+            return Err(format!(
+                "Could not retrieve cache for file {:?} (subtrahend in subtraction)",
+                subtrahend.file_name()
+            ));
+        };
+
+        for (pt_m, pt_s) in minuend_cache
+            .data
+            .iter_mut()
+            .zip(subtrahend_cache.data.iter())
+        {
+            pt_m.y -= pt_s.y
+        }
+
         Ok(EventState::Finished)
     }
 }

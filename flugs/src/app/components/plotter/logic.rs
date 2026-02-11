@@ -1,9 +1,12 @@
 use std::io::Write;
 
 use egui::Vec2;
-use egui_plot::PlotBounds;
+use egui_plot::{PlotBounds, PlotPoint};
 
-use crate::{app::components::File, EguiApp};
+use crate::{
+    app::{common::global_ymin, components::File},
+    EguiApp,
+};
 
 impl super::Plotter {
     pub(super) fn manipulate_file(
@@ -32,7 +35,7 @@ impl super::Plotter {
                 // plot bounds
                 let (mut xmin, mut ymin) = (f64::NAN, f64::INFINITY);
                 let (mut xmax, mut ymax) = (f64::NAN, -f64::INFINITY);
-                for [x, y] in active_file
+                for pt in active_file
                     .data
                     .value()
                     .as_ref()
@@ -41,13 +44,13 @@ impl super::Plotter {
                     .into_iter()
                     .flatten()
                 {
-                    if bounds.range_x().contains(x) && *y < ymin {
-                        xmin = *x;
-                        ymin = *y;
+                    if bounds.range_x().contains(&pt.x) && pt.y < ymin {
+                        xmin = pt.x;
+                        ymin = pt.y;
                     }
-                    if bounds.range_x().contains(x) && *y > ymax {
-                        xmax = *x;
-                        ymax = *y;
+                    if bounds.range_x().contains(&pt.x) && pt.y > ymax {
+                        xmax = pt.x;
+                        ymax = pt.y;
                     }
                 }
                 // To keep the minimal y-value in current plot bounds at the
@@ -62,7 +65,7 @@ impl super::Plotter {
                     .value()
                     .as_ref()
                     .ok()
-                    .map(|data| super::global_ymin(&data.get_cache().data))
+                    .map(|data| global_ymin(&data.get_cache().data))
                     .unwrap_or_default();
                 if !xmax.is_nan() && !xmin.is_nan() {
                     let yoffset_old = active_file.properties.yoffset;
@@ -185,15 +188,18 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
                 //     .collect();
                 //
 
-                let xs: Vec<_> = cached_data.iter().map(|[x, _]| x + x0).collect();
+                let xs: Vec<_> = cached_data
+                    .iter()
+                    .map(|PlotPoint { x, y: _ }| x + x0)
+                    .collect();
                 let ymin = cached_data
                     .iter()
-                    .map(|[_, y]| y)
+                    .map(|PlotPoint { x: _, y }| y)
                     .reduce(|current_min, yi| if yi < current_min { yi } else { current_min })
                     .unwrap_or(&0.0);
                 let ys: Vec<_> = cached_data
                     .iter()
-                    .map(|[_, y]| (y - ymin) * scale + y0 + ymin)
+                    .map(|PlotPoint { x: _, y }| (y - ymin) * scale + y0 + ymin)
                     .collect();
 
                 let line = LinePlot::new(&xs, &ys)

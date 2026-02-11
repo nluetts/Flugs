@@ -1,3 +1,4 @@
+pub mod common;
 mod components;
 pub mod config;
 mod events;

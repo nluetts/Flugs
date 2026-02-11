@@ -4,7 +4,10 @@ use egui::{text::LayoutJob, Color32, FontId};
 
 use crate::{
     app::{
-        events::{CloneFile, CopyFile, EventQueue, LocateFile, MoveFile, RemoveFile, RemoveGroup},
+        events::{
+            CloneFile, CopyFile, EventQueue, LocateFile, MoveFile, RemoveFile, RemoveGroup,
+            SubtractFile,
+        },
         DynRequestSender,
     },
     EguiApp,
@@ -168,6 +171,7 @@ impl FileHandler {
         ui: &mut egui::Ui,
         _ctx: &egui::Context,
     ) {
+        let ids: Vec<_> = self.registry.keys().map(|fid| *fid).collect();
         let file = match self.registry.get_mut(&fid) {
             Some(file) => file,
             None => {
@@ -212,6 +216,32 @@ impl FileHandler {
         };
 
         file.render_property_settings(ui);
+
+        ui.separator();
+        ui.heading("Subtract file(s)");
+        let text_selection = |maybe_id: Option<FileID>| match maybe_id {
+            Some(id) => format!("File ID {:?}", id),
+            None => "None".to_string(),
+        };
+
+        let prev_subtraction_selection = file.properties.subtract_file;
+        egui::ComboBox::new((fid, "subtract"), "Subtract file")
+            .selected_text(text_selection(file.properties.subtract_file))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut file.properties.subtract_file, None, "None");
+                for &other_fid in ids.iter().filter(|&&ofid| ofid != fid) {
+                    let label = text_selection(Some(other_fid));
+                    ui.selectable_value(&mut file.properties.subtract_file, Some(other_fid), label);
+                }
+            });
+        if prev_subtraction_selection != file.properties.subtract_file
+            && file.properties.subtract_file.is_some()
+        {
+            event_queue.queue_event(Box::new(SubtractFile::new(
+                fid,
+                file.properties.subtract_file.unwrap(),
+            )));
+        };
 
         ui.separator();
         ui.heading("Preview File Contents");
@@ -357,6 +387,9 @@ impl File {
                 val.regenerate_cache(
                     self.properties.selected_x_column,
                     self.properties.selected_y_column,
+                    self.properties.xoffset,
+                    self.properties.yoffset,
+                    self.properties.yscale,
                 );
             }
         };

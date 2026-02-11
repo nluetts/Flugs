@@ -54,6 +54,8 @@ pub struct FileProperties {
     // default values other than Default::default()
     #[serde(default = "serde_default_usize_1")]
     pub selected_y_column: usize,
+    #[serde(default)]
+    pub subtract_file: Option<FileID>,
 }
 
 fn serde_default_usize_1() -> usize {
@@ -130,6 +132,7 @@ impl Default for FileProperties {
             annotations: Vec::new(),
             selected_x_column: 0,
             selected_y_column: 1,
+            subtract_file: None,
         }
     }
 }

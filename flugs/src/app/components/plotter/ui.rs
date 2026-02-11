@@ -1,5 +1,5 @@
 use egui::Vec2;
-use egui_plot::{Legend, PlotBounds};
+use egui_plot::{Legend, PlotBounds, PlotPoint, PlotPoints};
 
 use crate::app::components::{File, FileHandler, FileID};
 
@@ -176,6 +176,15 @@ impl super::Plotter {
             let should_modify = modifier_down && drag.length() > 0.0;
             if should_modify {
                 self.manipulate_file(selected_file, modifiers, drag, bounds);
+                if let Ok(data) = selected_file.data.value_mut() {
+                    data.regenerate_cache(
+                        selected_file.properties.selected_x_column,
+                        selected_file.properties.selected_y_column,
+                        selected_file.properties.xoffset,
+                        selected_file.properties.yoffset,
+                        selected_file.properties.yscale,
+                    );
+                }
             }
         }
     }
@@ -183,22 +192,23 @@ impl super::Plotter {
     fn plot<'a>(
         &self,
         fid: &FileID,
-        file: &File,
+        file: &'a File,
         group_name: &str,
         plot_iu: &mut egui_plot::PlotUi<'a>,
     ) -> egui::Id {
         if let Some(data) = file.get_cache() {
-            let ymin = super::global_ymin(data);
-            // Apply custom shifting/scaling to data.
-            let data: Vec<[f64; 2]> = data
-                .iter()
-                .map(|[x, y]| {
-                    [
-                        x + file.properties.xoffset,
-                        (y - ymin) * file.properties.yscale + file.properties.yoffset + ymin,
-                    ]
-                })
-                .collect();
+            // TODO: Scaling/shifting should be upon event and then cached
+            // let ymin = super::global_ymin(data);
+            // // Apply custom shifting/scaling to data.
+            // let data: Vec<[f64; 2]> = data
+            //     .iter()
+            //     .map(|[x, y]| {
+            //         [
+            //             x + file.properties.xoffset,
+            //             (y - ymin) * file.properties.yscale + file.properties.yoffset + ymin,
+            //         ]
+            //     })
+            //     .collect();
 
             // Plot the data.
             let color = if let Some(color) = file.properties.color {
@@ -218,7 +228,7 @@ impl super::Plotter {
             };
             let egui_id = name.clone().into();
             plot_iu.line(
-                egui_plot::Line::new("".to_string(), data.to_owned())
+                egui_plot::Line::new("".to_string(), PlotPoints::Borrowed(data))
                     .color(color)
                     .width(width)
                     .name(name)
@@ -231,27 +241,29 @@ impl super::Plotter {
                     // Plot area under curve.
                     let mut plot_data = data
                         .iter()
-                        .filter_map(|[x, y]| {
-                            if x >= &xmin && x <= &xmax {
-                                Some([*x, *y])
+                        .filter_map(|pt| {
+                            if pt.x >= xmin && pt.x <= xmax {
+                                Some(*pt)
                             } else {
                                 None
                             }
                         })
-                        .collect::<Vec<[f64; 2]>>();
+                        .collect::<Vec<PlotPoint>>();
                     // TODO: how to plot area under curve down to a local baseline.
-                    if let (Some([x0, y0]), Some([x1, y1])) = (plot_data.first(), plot_data.last())
-                    {
+                    if let (Some(pt0), Some(pt1)) = (plot_data.first(), plot_data.last()) {
                         // Local baseline.
                         let line_data: Vec<_> = plot_data
                             .iter()
                             .rev()
-                            .map(|[x, _]| [*x, (y1 * (x - x0) + y0 * (x1 - x)) / (x1 - x0)])
+                            .map(|PlotPoint { x, y: _ }| PlotPoint {
+                                x: *x,
+                                y: (pt1.y * (x - pt0.x) + pt0.y * (pt1.x - x)) / (pt1.x - pt0.x),
+                            })
                             .collect();
                         plot_data.extend(line_data);
                     }
                     plot_iu.line(
-                        egui_plot::Line::new("".to_string(), plot_data)
+                        egui_plot::Line::new("".to_string(), PlotPoints::Owned(plot_data))
                             .color(egui::Color32::WHITE)
                             .width(width)
                             .id(egui_id),
@@ -295,6 +307,25 @@ impl super::Plotter {
                     file.properties.xoffset = 0.0;
                     file.properties.yoffset = 0.0;
                     file.properties.yscale = 1.0;
+                };
+            }
+        }
+        ui.label("Stack curves");
+        let drag_spacing = egui::DragValue::new(&mut self.space)
+            .speed(self.current_plot_bounds[3] - self.current_plot_bounds[2] / 10.0);
+        ui.add(drag_spacing);
+        if ui.button("Apply").clicked() {
+            for (i, fid) in file_handler
+                // Get IDs of all currently plotted files.
+                .groups
+                .iter()
+                .filter_map(|g| g.as_ref().filter(|g| g.is_plotted))
+                .flat_map(|g| g.file_ids.iter())
+                .enumerate()
+            {
+                if let Some(file) = file_handler.registry.get_mut(fid) {
+                    // Reset all offsets and scaling.
+                    file.properties.yoffset += i as f64 * self.space;
                 };
             }
         }

@@ -3,10 +3,13 @@
 use std::{collections::HashMap, path::Path};
 
 use app_core::string_error::ErrorStringExt;
+use egui_plot::PlotPoint;
+
+use crate::app::common::global_ymin;
 
 #[derive(Debug, Default, Clone)]
 pub struct PlotCache {
-    pub data: Vec<[f64; 2]>,
+    pub data: Vec<PlotPoint>,
     pub xcol: Option<usize>,
     pub ycol: usize,
 }
@@ -71,8 +74,24 @@ impl PlotData {
         &self.cache
     }
 
-    pub fn regenerate_cache(&mut self, x_col: usize, y_col: usize) {
-        if let Some(cache) = PlotCache::new(&self.columns, Some(x_col), y_col) {
+    pub fn get_cache_mut(&mut self) -> &mut PlotCache {
+        &mut self.cache
+    }
+
+    pub fn regenerate_cache(
+        &mut self,
+        x_col: usize,
+        y_col: usize,
+        xoffset: f64,
+        yoffset: f64,
+        yscale: f64,
+    ) {
+        if let Some(mut cache) = PlotCache::new(&self.columns, Some(x_col), y_col) {
+            let ymin = global_ymin(&cache.data);
+            for PlotPoint { x, y } in cache.data.iter_mut() {
+                *x += xoffset;
+                *y = (*y - ymin) * yscale + yoffset + ymin;
+            }
             self.cache = cache;
         }
     }
@@ -93,13 +112,17 @@ impl PlotCache {
     fn new(columns: &[Vec<f64>], xcol: Option<usize>, ycol: usize) -> Option<Self> {
         let ydata = columns.get(ycol)?;
         let data = if let Some(xdata) = xcol.map(|i| columns.get(i))? {
-            ydata.iter().zip(xdata).map(|(y, x)| [*x, *y]).collect()
+            ydata
+                .iter()
+                .zip(xdata)
+                .map(|(&y, &x)| PlotPoint { x, y })
+                .collect()
         } else {
             let n = ydata.len();
             ydata
                 .iter()
                 .zip(0..n)
-                .map(|(y, n)| [n as f64, *y])
+                .map(|(&y, n)| PlotPoint { x: n as f64, y })
                 .collect()
         };
         Some(Self { data, xcol, ycol })

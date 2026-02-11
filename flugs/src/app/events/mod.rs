@@ -2,13 +2,19 @@ use std::{path::PathBuf, thread::JoinHandle};
 
 use derive_new::new;
 
-use crate::app::storage::{load_json, save_json};
+use crate::app::{
+    components::{parse_csv, ParsedData},
+    storage::{load_json, save_json},
+};
 
 use super::{
     components::{FileID, Group},
     EguiApp,
 };
-use app_core::event::{AppEvent, EventState};
+use app_core::{
+    event::{AppEvent, EventState},
+    frontend::UIParameter,
+};
 
 // ---------------------------------------------------------------------------
 //
@@ -129,9 +135,18 @@ pub struct SavePlotRequested {
     thread_handle: Option<JoinHandle<Option<PathBuf>>>,
 }
 
+/// Save all files in a single folder
 #[derive(new)]
 pub struct ConsolidateRequest {
     thread_handle: Option<JoinHandle<Option<PathBuf>>>,
+}
+
+/// Locate a missing file in the current search folder
+#[derive(new)]
+pub struct LocateFile {
+    file_name: String,
+    id: FileID,
+    search_dispatched: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -307,5 +322,44 @@ impl AppEvent for ConsolidateRequest {
         } else {
             Ok(EventState::Busy)
         }
+    }
+}
+
+impl AppEvent for LocateFile {
+    type App = EguiApp;
+
+    fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
+        if !self.search_dispatched {
+            app.search
+                .search_single(&self.file_name, &mut app.request_tx);
+            self.search_dispatched = true;
+        }
+
+        if !app.search.matches.is_up_to_date() {
+            return Ok(EventState::Busy);
+        }
+
+        let file = app
+            .file_handler
+            .registry
+            .get_mut(&self.id)
+            .expect("Tried to located data for a file that does not exist!");
+        let fdata = file.data.value_mut();
+        match app.search.matches.value().first().take() {
+            Some(m) => {
+                file.path = app.search.get_search_path().join(&m.path);
+                match &m.parsed_data {
+                    ParsedData::Ok(plot_data) => *fdata = Ok(plot_data.to_owned()),
+                    ParsedData::Failed(msg) => *fdata = Err(msg.to_owned()),
+                    ParsedData::None => {
+                        let mut param = UIParameter::new(Err("Data no loaded".to_string()));
+                        param.set_recv(parse_csv(&file.path, &mut app.request_tx));
+                        file.data = param
+                    }
+                };
+            }
+            None => *fdata = Err(format!("File not found in current search path!")),
+        }
+        Ok(EventState::Finished)
     }
 }

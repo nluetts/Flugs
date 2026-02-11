@@ -4,7 +4,7 @@ use egui::{text::LayoutJob, Color32, FontId};
 
 use crate::{
     app::{
-        events::{CloneFile, CopyFile, EventQueue, MoveFile, RemoveFile, RemoveGroup},
+        events::{CloneFile, CopyFile, EventQueue, LocateFile, MoveFile, RemoveFile, RemoveGroup},
         DynRequestSender,
     },
     EguiApp,
@@ -176,8 +176,8 @@ impl FileHandler {
             }
         };
 
-        let id = file.file_name().to_owned();
-        ui.push_id(id, |ui| {
+        let ui_id = file.file_name().to_owned();
+        ui.push_id(ui_id, |ui| {
             ui.horizontal(|ui| {
                 let label = egui::Label::new(file.file_name()).truncate();
                 ui.add(label)
@@ -202,6 +202,13 @@ impl FileHandler {
         // Display error if csv could not be parsed.
         if let Err(error) = file.data.value() {
             ui.label(error).highlight();
+            if ui.small_button("Try to located").clicked() {
+                event_queue.queue_event(Box::new(LocateFile::new(
+                    file.file_name().to_owned(),
+                    fid,
+                    false,
+                )));
+            }
         };
 
         file.render_property_settings(ui);

@@ -8,7 +8,7 @@ use crate::app::DynRequestSender;
 use crate::backend_state::PlotData;
 use app_core::frontend::UIParameter;
 use egui::Color32;
-use logic::parse_csv;
+pub use logic::parse_csv;
 use serde::{Deserialize, Serialize};
 
 #[derive(

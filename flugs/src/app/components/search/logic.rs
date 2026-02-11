@@ -55,4 +55,9 @@ impl super::Search {
             request_tx,
         );
     }
+
+    pub fn search_single(&mut self, phrase: &str, request_tx: &mut DynRequestSender) {
+        self.search_query = phrase.to_owned();
+        self.query_current_path(request_tx);
+    }
 }

@@ -2,7 +2,7 @@ mod file_handling;
 mod plotter;
 mod search;
 
-pub use file_handling::{File, FileHandler};
+pub use file_handling::{parse_csv, File, FileHandler};
 pub(in crate::app) use file_handling::{FileID, FileProperties, Group};
 pub use plotter::{save_svg, Plotter, PlotterMode};
-pub use search::Search;
+pub use search::{ParsedData, Search};

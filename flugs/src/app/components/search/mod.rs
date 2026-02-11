@@ -33,10 +33,10 @@ enum SearchMode {
 
 #[derive(Debug, Clone, new)]
 pub struct Match {
-    pub(super) path: PathBuf,
+    pub path: PathBuf,
     pub(super) matched_indices: HashSet<usize>,
     pub(super) assigned_group: Option<usize>,
-    pub(super) parsed_data: ParsedData,
+    pub parsed_data: ParsedData,
 }
 
 #[derive(Debug, Clone)]

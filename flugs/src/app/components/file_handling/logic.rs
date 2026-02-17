@@ -83,6 +83,18 @@ impl File {
         }
     }
 
+    pub fn regenerate_cache(&mut self) {
+        if let Ok(data) = self.data.value_mut() {
+            data.regenerate_cache(
+                self.properties.selected_x_column,
+                self.properties.selected_y_column,
+                self.properties.xoffset,
+                self.properties.yoffset,
+                self.properties.yscale,
+            );
+        }
+    }
+
     pub fn local_minimum(&mut self, left: f64, right: f64, after_scaling: bool) -> f64 {
         // Retrieve its data, if it was parsed correctly.
         let Ok(data) = self.data.value() else {

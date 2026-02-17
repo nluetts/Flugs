@@ -5,13 +5,12 @@ use std::{collections::HashMap, path::Path};
 use app_core::string_error::ErrorStringExt;
 use egui_plot::PlotPoint;
 
-use crate::app::common::global_ymin;
-
 #[derive(Debug, Default, Clone)]
 pub struct PlotCache {
     pub data: Vec<PlotPoint>,
     pub xcol: Option<usize>,
     pub ycol: usize,
+    pub dirty: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -87,10 +86,9 @@ impl PlotData {
         yscale: f64,
     ) {
         if let Some(mut cache) = PlotCache::new(&self.columns, Some(x_col), y_col) {
-            let ymin = global_ymin(&cache.data);
             for PlotPoint { x, y } in cache.data.iter_mut() {
                 *x += xoffset;
-                *y = (*y - ymin) * yscale + yoffset + ymin;
+                *y = *y * yscale + yoffset;
             }
             self.cache = cache;
         }
@@ -125,6 +123,11 @@ impl PlotCache {
                 .map(|(&y, n)| PlotPoint { x: n as f64, y })
                 .collect()
         };
-        Some(Self { data, xcol, ycol })
+        Some(Self {
+            data,
+            xcol,
+            ycol,
+            dirty: false,
+        })
     }
 }

@@ -1,12 +1,18 @@
-use egui::Vec2;
 use egui_plot::{Legend, PlotBounds, PlotPoint, PlotPoints};
 
-use crate::app::components::{File, FileHandler, FileID};
+use crate::{
+    app::{
+        components::{File, FileHandler, FileID},
+        events::{EventQueue, TransformFileEvent},
+    },
+    EguiApp,
+};
 
 impl super::Plotter {
     pub fn render(
         &mut self,
         file_handler: &mut FileHandler,
+        event_queue: &mut EventQueue<EguiApp>,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
     ) {
@@ -16,10 +22,6 @@ impl super::Plotter {
                 ui.toggle_value(&mut grp.is_plotted, &grp.name);
             }
         });
-
-        // These are needed to apply modifications to the selected file.
-        let mut spans = (0.0, 0.0);
-        let mut drag = Vec2::default();
 
         let allow_drag = self.selected_fid.is_none() && self.mode != super::PlotterMode::Integrate;
 
@@ -127,29 +129,20 @@ impl super::Plotter {
                         }
                     }
                 }
-                drag = plot_ui.pointer_coordinate_drag_delta();
-                spans = {
-                    let bounds = plot_ui.plot_bounds();
-                    let xspan = (bounds.max()[0] - bounds.min()[0]).abs();
-                    let yspan = (bounds.max()[1] - bounds.min()[1]).abs();
-                    (xspan, yspan)
-                };
-                self.current_plot_bounds = {
-                    let [xmin, ymin] = plot_ui.plot_bounds().min();
-                    let [xmax, ymax] = plot_ui.plot_bounds().max();
-                    [xmin, xmax, ymin, ymax]
-                };
+                let drag = plot_ui.pointer_coordinate_drag_delta();
+                self.current_plot_bounds = plot_ui.plot_bounds();
 
                 // We need to "exfiltrate" the current plot bounds
                 // and whether the plot was clicked from this closure.
-                (plot_ui.plot_bounds(), plot_ui.response().clicked())
+                (plot_ui.response().clicked(), drag)
             });
 
-        // Get modifier input (we need this here already, to disallow the plot
+        // Get input (we need this here already, to disallow the plot
         // to be panned).
-        let modifiers = ctx.input(|i| [i.modifiers.alt, i.modifiers.ctrl, i.modifiers.shift]);
-        let modifier_down = modifiers.iter().any(|x| *x);
-        let plot_clicked = response.inner.1;
+        let modifiers = ctx.input(|i| i.modifiers);
+        let modifier_down = modifiers.any();
+        let plot_clicked = response.inner.0;
+        let drag = response.inner.1;
 
         if let Some(hovered_fid) = response
             .hovered_plot_item
@@ -168,23 +161,14 @@ impl super::Plotter {
                 self.selected_fid = None;
             }
         }
-        if let Some(selected_file) = self
-            .selected_fid
-            .and_then(|fid| file_handler.registry.get_mut(&fid))
-        {
-            let bounds = response.inner.0;
-            let should_modify = modifier_down && drag.length() > 0.0;
-            if should_modify {
-                self.manipulate_file(selected_file, modifiers, drag, bounds);
-                if let Ok(data) = selected_file.data.value_mut() {
-                    data.regenerate_cache(
-                        selected_file.properties.selected_x_column,
-                        selected_file.properties.selected_y_column,
-                        selected_file.properties.xoffset,
-                        selected_file.properties.yoffset,
-                        selected_file.properties.yscale,
-                    );
-                }
+        if let Some(selected_fid) = self.selected_fid {
+            // Check if we should modify
+            if modifier_down && drag.length() > 0.0 {
+                event_queue.queue_event(Box::new(TransformFileEvent::new(
+                    selected_fid,
+                    modifiers,
+                    drag,
+                )));
             }
         }
     }
@@ -197,19 +181,6 @@ impl super::Plotter {
         plot_iu: &mut egui_plot::PlotUi<'a>,
     ) -> egui::Id {
         if let Some(data) = file.get_cache() {
-            // TODO: Scaling/shifting should be upon event and then cached
-            // let ymin = super::global_ymin(data);
-            // // Apply custom shifting/scaling to data.
-            // let data: Vec<[f64; 2]> = data
-            //     .iter()
-            //     .map(|[x, y]| {
-            //         [
-            //             x + file.properties.xoffset,
-            //             (y - ymin) * file.properties.yscale + file.properties.yoffset + ymin,
-            //         ]
-            //     })
-            //     .collect();
-
             // Plot the data.
             let color = if let Some(color) = file.properties.color {
                 color
@@ -311,8 +282,8 @@ impl super::Plotter {
             }
         }
         ui.label("Stack curves");
-        let drag_spacing = egui::DragValue::new(&mut self.space)
-            .speed(self.current_plot_bounds[3] - self.current_plot_bounds[2] / 10.0);
+        let drag_spacing =
+            egui::DragValue::new(&mut self.space).speed(self.current_plot_bounds.height() / 10.0);
         ui.add(drag_spacing);
         if ui.button("Apply").clicked() {
             for (i, fid) in file_handler
@@ -352,12 +323,11 @@ impl super::Plotter {
         );
         // Integration window.
         if let Some((a, b)) = self.current_integral.iter_mut().next() {
-            let [xmin, xmax, _, _] = self.current_plot_bounds;
             ui.label("Left bound");
-            ui.add(egui::DragValue::new(a).speed((xmax - xmin).abs() / 500.0))
+            ui.add(egui::DragValue::new(a).speed(self.current_plot_bounds.width().abs() / 500.0))
                 .on_hover_cursor(egui::CursorIcon::Text);
             ui.label("Right bound");
-            ui.add(egui::DragValue::new(b).speed((xmax - xmin).abs() / 500.0))
+            ui.add(egui::DragValue::new(b).speed(self.current_plot_bounds.width().abs() / 500.0))
                 .on_hover_cursor(egui::CursorIcon::Text);
 
             ui.separator();

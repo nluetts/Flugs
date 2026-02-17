@@ -48,7 +48,11 @@ pub fn save_json(app: &EguiApp, path: Option<&Path>) -> Result<(), String> {
             })
             .collect(),
         next_id: app.file_handler.current_id(),
-        plot_bounds: Some(app.plotter.get_current_plot_bounds()),
+        plot_bounds: Some({
+            let bounds = app.plotter.get_current_plot_bounds();
+            let ([xmin, ymin], [xmax, ymax]) = (bounds.min(), bounds.max());
+            [xmin, xmax, ymin, ymax]
+        }),
     };
     let storage = Storage::new(backend_storage, frontend_storage);
     storage.save_json(path)

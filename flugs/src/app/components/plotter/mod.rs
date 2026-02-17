@@ -1,6 +1,7 @@
 mod logic;
 mod ui;
 
+use egui_plot::PlotBounds;
 pub use logic::save_svg;
 
 use std::collections::HashMap;
@@ -12,7 +13,7 @@ pub struct Plotter {
     /// IDs. We need this to detect interactions with plotted files.
     files_plot_ids: HashMap<egui::Id, FileID>,
     selected_fid: Option<FileID>,
-    current_plot_bounds: [f64; 4],
+    current_plot_bounds: PlotBounds,
     current_integral: Option<(f64, f64)>,
     current_annotation: Annotation,
     integrate_with_local_baseline: bool,
@@ -27,7 +28,7 @@ impl Plotter {
         Self {
             files_plot_ids: HashMap::with_capacity(10),
             selected_fid: None,
-            current_plot_bounds: [0.0, 0.0, 0.0, 0.0],
+            current_plot_bounds: PlotBounds::new_symmetrical(0.5),
             current_integral: None,
             current_annotation: Annotation::default(),
             mode: PlotterMode::Display,

@@ -1,6 +1,7 @@
 use std::{path::PathBuf, thread::JoinHandle};
 
 use derive_new::new;
+use egui::{Modifiers, Vec2};
 
 use crate::app::{
     components::{parse_csv, ParsedData},
@@ -155,6 +156,13 @@ pub struct SubtractFile {
     // minuend − subtrahend = difference
     minuend: FileID,
     subtrahend: FileID,
+}
+
+#[derive(new)]
+pub struct TransformFileEvent {
+    fid: FileID,
+    modifiers: Modifiers,
+    drag: Vec2,
 }
 
 // ---------------------------------------------------------------------------
@@ -392,18 +400,15 @@ impl AppEvent for SubtractFile {
             ));
         };
 
-        let Ok(minuend_cache) = minuend.data.value_mut().as_mut().and_then(|data| {
-            // We have to reset the cache so we do not subtract other files
-            // several times.
-            data.regenerate_cache(
-                minuend.properties.selected_x_column,
-                minuend.properties.selected_y_column,
-                minuend.properties.xoffset,
-                minuend.properties.yoffset,
-                minuend.properties.yscale,
-            );
-            Ok(data.get_cache_mut())
-        }) else {
+        // We have to reset the cache so we do not subtract other files
+        // several times.
+        minuend.regenerate_cache();
+        let Ok(minuend_cache) = minuend
+            .data
+            .value_mut()
+            .as_mut()
+            .and_then(|data| Ok(data.get_cache_mut()))
+        else {
             return Err(format!(
                 "Could not retrieve cache for file {:?} (minuend in subtraction)",
                 minuend.file_name()
@@ -430,6 +435,67 @@ impl AppEvent for SubtractFile {
             pt_m.y -= pt_s.y
         }
 
+        Ok(EventState::Finished)
+    }
+}
+
+impl AppEvent for TransformFileEvent {
+    type App = EguiApp;
+
+    fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
+        let Some(active_file) = app.file_handler.registry.get_mut(&self.fid) else {
+            return Err(format!(
+                "Cannot transform file with ID {:?}: not found in registry",
+                self.fid
+            ));
+        };
+
+        // How much did the mouse move?
+        let Vec2 { x: dx, y: dy } = self.drag;
+        let bounds = app.plotter.get_current_plot_bounds();
+        let yspan = bounds.height();
+        // Alt key is pressed → change xoffset.
+        if self.modifiers.alt {
+            active_file.properties.xoffset += dx as f64;
+        // Ctrl key is pressed → change yoffset.
+        } else if self.modifiers.ctrl {
+            active_file.properties.yoffset += dy as f64;
+        // Shift is pressed → change yscale.
+        } else if self.modifiers.shift {
+            let yscale_old = active_file.properties.yscale;
+            let yoffset_old = active_file.properties.yoffset;
+            // Find index of point with minimum y-value that falls within
+            // plot bounds
+            let (mut xmin, mut ymin) = (f64::NAN, f64::INFINITY);
+            let Some(cache) = active_file.get_cache() else {
+                return Err(format!(
+                    "Unable to get cache for file with ID {:?}",
+                    self.fid
+                ));
+            };
+            for pt in cache.iter() {
+                if bounds.range_x().contains(&pt.x)
+                    && bounds.range_y().contains(&pt.y)
+                    && pt.y < ymin
+                {
+                    xmin = pt.x;
+                    ymin = pt.y;
+                }
+            }
+            if !xmin.is_nan() {
+                let yscale_new = yscale_old * (1.0 + 3.0 * (dy as f64) / yspan);
+                // Calculate new offset to fix ymin at its current position
+                let ymin_0 = (ymin - yoffset_old) / yscale_old;
+                let ymin_new = ymin_0 * yscale_new;
+                let offset = ymin - ymin_new;
+
+                active_file.properties.yscale = yscale_new;
+                active_file.properties.yoffset = offset;
+            } else {
+                active_file.properties.yscale += yscale_old * 3.0 / yspan * (dy as f64);
+            }
+        }
+        active_file.regenerate_cache();
         Ok(EventState::Finished)
     }
 }

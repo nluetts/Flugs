@@ -1,96 +1,15 @@
 use std::io::Write;
 
-use egui::Vec2;
-use egui_plot::PlotBounds;
+use egui_plot::{PlotBounds, PlotPoint};
 
-use crate::{app::components::File, EguiApp};
+use crate::EguiApp;
 
 impl super::Plotter {
-    pub(super) fn manipulate_file(
-        &mut self,
-        active_file: &mut File,
-        modifiers: [bool; 3],
-        drag: Vec2,
-        bounds: PlotBounds,
-    ) {
-        // How much did the mouse move?
-        let Vec2 { x: dx, y: dy } = drag;
-        let yspan = bounds.height();
-        match modifiers {
-            // Alt key is pressed → change xoffset.
-            [true, false, false] => {
-                active_file.properties.xoffset += dx as f64;
-            }
-            // Ctrl key is pressed → change yoffset.
-            [false, true, false] => {
-                active_file.properties.yoffset += dy as f64;
-            }
-            // Shift is pressed → change yscale.
-            [false, false, true] => {
-                let yscale_old = active_file.properties.yscale;
-                // Find index of point with minimum y-value that falls within
-                // plot bounds
-                let (mut xmin, mut ymin) = (f64::NAN, f64::INFINITY);
-                let (mut xmax, mut ymax) = (f64::NAN, -f64::INFINITY);
-                for [x, y] in active_file
-                    .data
-                    .value()
-                    .as_ref()
-                    .ok()
-                    .map(|data| &data.get_cache().data)
-                    .into_iter()
-                    .flatten()
-                {
-                    if bounds.range_x().contains(x) && *y < ymin {
-                        xmin = *x;
-                        ymin = *y;
-                    }
-                    if bounds.range_x().contains(x) && *y > ymax {
-                        xmax = *x;
-                        ymax = *y;
-                    }
-                }
-                // To keep the minimal y-value in current plot bounds at the
-                // same position, consider:
-                // y = m * (ymin - global_ymin) + b
-                // y' = m' * (ymin - global_ymin) + b'
-                // m * (ymin - global_ymin) + b = m' * (ymin - global_ymin) + b'
-                // b' = (ymin - global_ymin) * (m - m') + b
-                // (y = scaled y-value, m = yscale, b = yoffset, prime = new values)
-                let global_ymin = active_file
-                    .data
-                    .value()
-                    .as_ref()
-                    .ok()
-                    .map(|data| super::global_ymin(&data.get_cache().data))
-                    .unwrap_or_default();
-                if !xmax.is_nan() && !xmin.is_nan() {
-                    let yoffset_old = active_file.properties.yoffset;
-                    // New scaling and offset
-                    active_file.properties.yscale += yscale_old * 3.0 / yspan * (dy as f64);
-                    active_file.properties.yoffset = (ymin - global_ymin)
-                        * (yscale_old - active_file.properties.yscale)
-                        + yoffset_old;
-                    log::debug!(
-                        "xmin: {xmin}, ymin: {}, bounds: {bounds:?}",
-                        ymin * active_file.properties.yscale + active_file.properties.yoffset
-                    );
-                } else {
-                    let yspan = bounds.height();
-                    active_file.properties.yscale += yscale_old * 3.0 / yspan * (dy as f64);
-                }
-            }
-            // If several modifiers are pressed at the same time,
-            // we ignore the input.
-            _ => (),
-        }
-    }
-
     pub fn apply_bounds(&mut self, bounds: [f64; 4]) {
         self.request_plot_bounds = Some(bounds);
     }
 
-    pub fn get_current_plot_bounds(&self) -> [f64; 4] {
+    pub fn get_current_plot_bounds(&self) -> PlotBounds {
         self.current_plot_bounds
     }
 }
@@ -108,7 +27,10 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
         }
     };
 
-    let [xmin, xmax, ymin, ymax] = app.plotter.current_plot_bounds;
+    let ([xmin, ymin], [xmax, ymax]) = (
+        app.plotter.current_plot_bounds.min(),
+        app.plotter.current_plot_bounds.max(),
+    );
 
     let mut fig = Figure::empty(app.config.svg_width, app.config.svg_height);
     let mut ax = Axis::default()
@@ -158,11 +80,6 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
                         .collect()
                 };
 
-                let (scale, x0, y0) = (
-                    plot_file.properties.yscale,
-                    plot_file.properties.xoffset,
-                    plot_file.properties.yoffset,
-                );
                 let label = if !plot_file.properties.alias.is_empty() {
                     format!("{} ({})", &plot_file.properties.alias, grp.name)
                 } else {
@@ -185,16 +102,19 @@ pub fn save_svg(app: &EguiApp, path: &std::path::Path) {
                 //     .collect();
                 //
 
-                let xs: Vec<_> = cached_data.iter().map(|[x, _]| x + x0).collect();
-                let ymin = cached_data
-                    .iter()
-                    .map(|[_, y]| y)
-                    .reduce(|current_min, yi| if yi < current_min { yi } else { current_min })
-                    .unwrap_or(&0.0);
-                let ys: Vec<_> = cached_data
-                    .iter()
-                    .map(|[_, y]| (y - ymin) * scale + y0 + ymin)
-                    .collect();
+                let mut xs = Vec::with_capacity(cached_data.len());
+                let mut ys = Vec::with_capacity(cached_data.len());
+                let mut ymin = None;
+
+                for PlotPoint { x, y } in cached_data.iter() {
+                    xs.push(*x);
+                    ys.push(*y);
+                    match ymin {
+                        Some(ymin_prev) if y < ymin_prev => ymin = Some(y),
+                        None => ymin = Some(y),
+                        _ => (),
+                    }
+                }
 
                 let line = LinePlot::new(&xs, &ys)
                     .with_color(&color)

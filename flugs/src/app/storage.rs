@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::EguiApp;
 
 use super::{
-    components::{File, FileID, FileProperties, Group},
     DynRequestSender, FileHandler,
+    components::{File, FileID, FileProperties, Group},
 };
 
 // Currently not used, since the only backend state to safe right now is the
@@ -48,7 +48,13 @@ pub fn save_json(app: &EguiApp, path: Option<&Path>) -> Result<(), String> {
             })
             .collect(),
         next_id: app.file_handler.current_id(),
-        plot_bounds: Some(app.plotter.get_current_plot_bounds()),
+        plot_bounds: Some({
+            let ([xmin, ymin], [xmax, ymax]) = (
+                app.plotter.get_current_plot_bounds().min(),
+                app.plotter.get_current_plot_bounds().max(),
+            );
+            [xmin, xmax, ymin, ymax]
+        }),
     };
     let storage = Storage::new(backend_storage, frontend_storage);
     storage.save_json(path)

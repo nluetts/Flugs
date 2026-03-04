@@ -3,20 +3,14 @@
 use std::{collections::HashMap, path::Path};
 
 use app_core::string_error::ErrorStringExt;
-
-#[derive(Debug, Default, Clone)]
-pub struct PlotCache {
-    pub data: Vec<[f64; 2]>,
-    pub xcol: Option<usize>,
-    pub ycol: usize,
-}
+use egui_plot::PlotPoint;
 
 #[derive(Clone, Debug, Default)]
 pub struct PlotData {
     pub columns: Vec<Vec<f64>>,
     num_columns: usize,
     comments: String,
-    cache: PlotCache,
+    cache: Vec<PlotPoint>,
 }
 
 // Helper struct to counts frequencies of potential delimiter characters.
@@ -48,13 +42,12 @@ impl PlotData {
             parser.parse_as_floats()
         };
 
-        let cache = if let Some(cache) = PlotCache::new(&columns, Some(0), 1) {
+        let cache = if let Some(cache) = new_cache(&columns, Some(0), 1) {
             log::debug!("add first two columns to cache");
             cache
         } else {
             log::debug!("add first column to cache");
-            PlotCache::new(&columns, None, 0)
-                .ok_or(format!("unable to load cache for {:?}", path))?
+            new_cache(&columns, None, 0).ok_or(format!("unable to load cache for {:?}", path))?
         };
 
         let num_columns = columns.len();
@@ -67,14 +60,20 @@ impl PlotData {
         })
     }
 
-    pub fn get_cache(&self) -> &PlotCache {
+    pub fn get_cache(&self) -> &[PlotPoint] {
         &self.cache
     }
 
     pub fn regenerate_cache(&mut self, x_col: usize, y_col: usize) {
-        if let Some(cache) = PlotCache::new(&self.columns, Some(x_col), y_col) {
+        if let Some(cache) = new_cache(&self.columns, Some(x_col), y_col) {
             self.cache = cache;
         }
+    }
+
+    pub fn rescale(&mut self, xoffset: f64, yoffset: f64, yscale: f64) -> Option<()> {
+        // TODO: Selected columns are hard-coded, for now
+        self.cache = scaled_cache(&self.columns, Some(0), 1, xoffset, yoffset, yscale)?;
+        Some(())
     }
 
     pub fn ymin(&self, ycol: usize) -> Option<f64> {
@@ -89,19 +88,51 @@ impl PlotData {
     }
 }
 
-impl PlotCache {
-    fn new(columns: &[Vec<f64>], xcol: Option<usize>, ycol: usize) -> Option<Self> {
-        let ydata = columns.get(ycol)?;
-        let data = if let Some(xdata) = xcol.map(|i| columns.get(i))? {
-            ydata.iter().zip(xdata).map(|(y, x)| [*x, *y]).collect()
-        } else {
-            let n = ydata.len();
-            ydata
-                .iter()
-                .zip(0..n)
-                .map(|(y, n)| [n as f64, *y])
-                .collect()
-        };
-        Some(Self { data, xcol, ycol })
-    }
+fn new_cache(columns: &[Vec<f64>], xcol: Option<usize>, ycol: usize) -> Option<Vec<PlotPoint>> {
+    let ydata = columns.get(ycol)?;
+    let data = if let Some(xdata) = xcol.map(|i| columns.get(i))? {
+        xdata
+            .iter()
+            .zip(ydata)
+            .map(|(&x, &y)| PlotPoint { x, y })
+            .collect()
+    } else {
+        ydata
+            .iter()
+            .zip(0..)
+            .map(|(&y, n)| PlotPoint { x: n as f64, y })
+            .collect()
+    };
+    Some(data)
+}
+
+fn scaled_cache(
+    columns: &[Vec<f64>],
+    xcol: Option<usize>,
+    ycol: usize,
+    xoffset: f64,
+    yoffset: f64,
+    yscale: f64,
+) -> Option<Vec<PlotPoint>> {
+    let ydata = columns.get(ycol)?;
+    let data = if let Some(xdata) = xcol.map(|i| columns.get(i))? {
+        xdata
+            .iter()
+            .zip(ydata)
+            .map(|(&x, &y)| PlotPoint {
+                x: x + xoffset,
+                y: (y * yscale) + yoffset,
+            })
+            .collect()
+    } else {
+        ydata
+            .iter()
+            .zip(0..)
+            .map(|(&y, n)| PlotPoint {
+                x: n as f64,
+                y: (y * yscale) + yoffset,
+            })
+            .collect()
+    };
+    Some(data)
 }

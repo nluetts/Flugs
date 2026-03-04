@@ -1,12 +1,16 @@
 use egui::Vec2;
-use egui_plot::{Legend, PlotBounds};
+use egui_plot::{Legend, PlotBounds, PlotPoint, PlotPoints};
 
-use crate::app::components::{File, FileHandler, FileID};
+use crate::app::{
+    components::{File, FileHandler, FileID},
+    events::{EventQueue, ManipulateFile},
+};
 
 impl super::Plotter {
     pub fn render(
         &mut self,
         file_handler: &mut FileHandler,
+        event_queue: &mut EventQueue<crate::EguiApp>,
         ui: &mut egui::Ui,
         ctx: &egui::Context,
     ) {
@@ -134,22 +138,18 @@ impl super::Plotter {
                     let yspan = (bounds.max()[1] - bounds.min()[1]).abs();
                     (xspan, yspan)
                 };
-                self.current_plot_bounds = {
-                    let [xmin, ymin] = plot_ui.plot_bounds().min();
-                    let [xmax, ymax] = plot_ui.plot_bounds().max();
-                    [xmin, xmax, ymin, ymax]
-                };
+                self.current_plot_bounds = plot_ui.plot_bounds();
 
                 // We need to "exfiltrate" the current plot bounds
                 // and whether the plot was clicked from this closure.
-                (plot_ui.plot_bounds(), plot_ui.response().clicked())
+                plot_ui.response().clicked()
             });
 
         // Get modifier input (we need this here already, to disallow the plot
         // to be panned).
-        let modifiers = ctx.input(|i| [i.modifiers.alt, i.modifiers.ctrl, i.modifiers.shift]);
-        let modifier_down = modifiers.iter().any(|x| *x);
-        let plot_clicked = response.inner.1;
+        let modifiers = ctx.input(|i| i.modifiers);
+        let modifier_down = modifiers.any();
+        let plot_clicked = response.inner;
 
         if let Some(hovered_fid) = response
             .hovered_plot_item
@@ -168,37 +168,33 @@ impl super::Plotter {
                 self.selected_fid = None;
             }
         }
-        if let Some(selected_file) = self
-            .selected_fid
-            .and_then(|fid| file_handler.registry.get_mut(&fid))
+        let should_modify = modifier_down && drag.length() > 0.0;
+        if let Some(fid) = self.selected_fid
+            && should_modify
         {
-            let bounds = response.inner.0;
-            let should_modify = modifier_down && drag.length() > 0.0;
-            if should_modify {
-                self.manipulate_file(selected_file, modifiers, drag, bounds);
-            }
+            event_queue.queue_event(Box::new(ManipulateFile::new(fid, drag, modifiers)));
         }
     }
 
     fn plot<'a>(
         &self,
         fid: &FileID,
-        file: &File,
+        file: &'a File,
         group_name: &str,
         plot_iu: &mut egui_plot::PlotUi<'a>,
     ) -> egui::Id {
         if let Some(data) = file.get_cache() {
-            let ymin = super::global_ymin(data);
+            // TODO: Cache scaling/shifting
             // Apply custom shifting/scaling to data.
-            let data: Vec<[f64; 2]> = data
-                .iter()
-                .map(|[x, y]| {
-                    [
-                        x + file.properties.xoffset,
-                        (y - ymin) * file.properties.yscale + file.properties.yoffset + ymin,
-                    ]
-                })
-                .collect();
+            // let data: Vec<[f64; 2]> = data
+            //     .iter()
+            //     .map(|[x, y]| {
+            //         [
+            //             x + file.properties.xoffset,
+            //             (y - ymin) * file.properties.yscale + file.properties.yoffset + ymin,
+            //         ]
+            //     })
+            //     .collect();
 
             // Plot the data.
             let color = if let Some(color) = file.properties.color {
@@ -218,7 +214,7 @@ impl super::Plotter {
             };
             let egui_id = name.clone().into();
             plot_iu.line(
-                egui_plot::Line::new("".to_string(), data.to_owned())
+                egui_plot::Line::new("".to_string(), PlotPoints::Borrowed(data))
                     .color(color)
                     .width(width)
                     .name(name)
@@ -231,7 +227,7 @@ impl super::Plotter {
                     // Plot area under curve.
                     let mut plot_data = data
                         .iter()
-                        .filter_map(|[x, y]| {
+                        .filter_map(|PlotPoint { x, y }| {
                             if x >= &xmin && x <= &xmax {
                                 Some([*x, *y])
                             } else {
@@ -321,7 +317,10 @@ impl super::Plotter {
         );
         // Integration window.
         if let Some((a, b)) = self.current_integral.iter_mut().next() {
-            let [xmin, xmax, _, _] = self.current_plot_bounds;
+            let ([xmin, _ymin], [xmax, _ymax]) = (
+                self.current_plot_bounds.min(),
+                self.current_plot_bounds.max(),
+            );
             ui.label("Left bound");
             ui.add(egui::DragValue::new(a).speed((xmax - xmin).abs() / 500.0))
                 .on_hover_cursor(egui::CursorIcon::Text);
@@ -438,11 +437,7 @@ impl super::Plotter {
                             let dist_b = ((b.x - self.current_annotation.x).powi(2)
                                 + (b.y - self.current_annotation.y).powi(2))
                             .sqrt();
-                            if dist_a < dist_b {
-                                (i, a)
-                            } else {
-                                (j, b)
-                            }
+                            if dist_a < dist_b { (i, a) } else { (j, b) }
                         },
                     )
             {

@@ -1,15 +1,16 @@
 use std::{path::PathBuf, thread::JoinHandle};
 
 use derive_new::new;
+use egui_plot::PlotPoint;
 
 use crate::app::{
-    components::{parse_csv, ParsedData},
+    components::{ParsedData, parse_csv},
     storage::{load_json, save_json},
 };
 
 use super::{
-    components::{FileID, Group},
     EguiApp,
+    components::{FileID, Group},
 };
 use app_core::{
     event::{AppEvent, EventState},
@@ -147,6 +148,14 @@ pub struct LocateFile {
     file_name: String,
     id: FileID,
     search_dispatched: bool,
+}
+
+/// Manipulate a file's scaling/offset interactively
+#[derive(new)]
+pub struct ManipulateFile {
+    fid: FileID,
+    drag: egui::Vec2,
+    modifiers: egui::Modifiers,
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +369,75 @@ impl AppEvent for LocateFile {
             }
             None => *fdata = Err(format!("File not found in current search path!")),
         }
+        Ok(EventState::Finished)
+    }
+}
+
+impl AppEvent for ManipulateFile {
+    type App = EguiApp;
+
+    fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
+        // How much did the mouse move?
+        let egui::Vec2 { x: dx, y: dy } = self.drag;
+        let bounds = app.plotter.get_current_plot_bounds();
+        let yspan = bounds.height();
+
+        let Some(active_file) = app.file_handler.registry.get_mut(&self.fid) else {
+            return Err(format!(
+                "Cannot manipulate file with ID {:?}: not found!",
+                self.fid
+            ));
+        };
+
+        if self.modifiers.alt {
+            // Alt key is pressed → change xoffset.
+            active_file.properties.xoffset += dx as f64;
+        } else if self.modifiers.ctrl {
+            // Ctrl key is pressed → change yoffset.
+            active_file.properties.yoffset += dy as f64;
+        } else if self.modifiers.shift {
+            let yscale_old = active_file.properties.yscale;
+            let yoffset_old = active_file.properties.yoffset;
+            // Find index of point with minimum y-value that falls within
+            // plot bounds
+            let mut ymin = None;
+            for PlotPoint { x, y } in active_file
+                .data
+                .value()
+                .as_ref()
+                .ok()
+                .map(|data| data.get_cache())
+                .into_iter()
+                .flatten()
+            {
+                if bounds.range_x().contains(x) && bounds.range_y().contains(y) && y.is_finite() {
+                    match ymin {
+                        Some(ymin_inner) if ymin_inner > *y => ymin = Some(*y),
+                        None if y.is_finite() => ymin = Some(*y),
+                        _ => (),
+                    }
+                }
+            }
+
+            let Some(ymin) = ymin else {
+                return Err(format!(
+                    "Manipulate file with ID {:?} failed: unable to find minimum y-value",
+                    self.fid
+                ));
+            };
+
+            let yscale_new = yscale_old * (1.0 + 3.0 / yspan * (dy as f64));
+            // Minimal y before any manipulations
+            let ymin_0 = (ymin - yoffset_old) / yscale_old;
+            let ymin_new = ymin_0 * yscale_new + yoffset_old;
+            active_file.properties.yscale = yscale_new;
+            active_file.properties.yoffset -= if ymin < 0.0 {
+                ymin - ymin_new
+            } else {
+                ymin_new - ymin
+            };
+        }
+        active_file.refresh_cache();
         Ok(EventState::Finished)
     }
 }

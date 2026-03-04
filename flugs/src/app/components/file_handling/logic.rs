@@ -1,32 +1,29 @@
 use std::{collections::HashSet, path::Path};
 
 use app_core::{
+    BACKEND_HUNG_UP_MSG,
     backend::{BackendEventLoop, BackendLink, LinkReceiver},
     frontend::UIParameter,
-    BACKEND_HUNG_UP_MSG,
 };
+use egui_plot::PlotPoint;
 
 use crate::{
+    BackendAppState,
     app::{
-        components::{
-            search::{Match, ParsedData},
-            Search,
-        },
         DynRequestSender,
+        components::{
+            Search,
+            search::{Match, ParsedData},
+        },
     },
     backend_state::PlotData,
-    BackendAppState,
 };
 
 use super::{File, FileHandler, FileID, Group};
 
 impl File {
-    pub fn get_cache(&self) -> Option<&Vec<[f64; 2]>> {
-        self.data
-            .value()
-            .as_ref()
-            .map(|dat| &dat.get_cache().data)
-            .ok()
+    pub fn get_cache(&self) -> Option<&[PlotPoint]> {
+        self.data.value().as_ref().map(|dat| dat.get_cache()).ok()
     }
 
     // Integrate data numerically using trapezoidal method.
@@ -131,6 +128,17 @@ impl File {
             minimum *= self.properties.yscale
         }
         minimum
+    }
+
+    pub fn refresh_cache(&mut self) {
+        let Ok(data) = self.data.value_mut() else {
+            return;
+        };
+        data.rescale(
+            self.properties.xoffset,
+            self.properties.yoffset,
+            self.properties.yscale,
+        );
     }
 }
 

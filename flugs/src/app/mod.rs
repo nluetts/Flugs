@@ -4,9 +4,9 @@ mod events;
 pub mod storage;
 
 use self::components::{Plotter, Search};
+use crate::BackendAppState;
 use crate::app::events::ConsolidateRequest;
 use crate::app::events::EventQueue;
-use crate::BackendAppState;
 use app_core::backend::BackendRequest;
 use config::Config;
 use events::{SaveLoadRequested, SavePlotRequested};
@@ -188,7 +188,9 @@ impl EguiApp {
 
         use UISelection as U;
         match self.ui_selection {
-            U::Plot => self.plotter.render(&mut self.file_handler, ui, ctx),
+            U::Plot => self
+                .plotter
+                .render(&mut self.file_handler, &mut self.event_queue, ui, ctx),
             U::FileSettings => {
                 self.file_handler
                     .render(&mut self.request_tx, &mut self.event_queue, ui, ctx)

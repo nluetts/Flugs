@@ -1,13 +1,16 @@
 use std::fmt::Write;
 
-use egui::{text::LayoutJob, Color32, FontId};
+use egui::{Color32, FontId, text::LayoutJob};
 
 use crate::{
-    app::{
-        events::{CloneFile, CopyFile, EventQueue, LocateFile, MoveFile, RemoveFile, RemoveGroup},
-        DynRequestSender,
-    },
     EguiApp,
+    app::{
+        DynRequestSender,
+        events::{
+            CloneFile, CopyFile, EventQueue, LocateFile, MoveFile, RefreshCache, RemoveFile,
+            RemoveGroup, ResetScaling,
+        },
+    },
 };
 
 use super::{ActiveElement, File, FileHandler, FileID};
@@ -211,7 +214,7 @@ impl FileHandler {
             }
         };
 
-        file.render_property_settings(ui);
+        file.render_property_settings(ui, fid, event_queue);
 
         ui.separator();
         ui.heading("Preview File Contents");
@@ -317,7 +320,12 @@ impl FileHandler {
 }
 
 impl File {
-    pub fn render_property_settings(&mut self, ui: &mut egui::Ui) {
+    pub fn render_property_settings(
+        &mut self,
+        ui: &mut egui::Ui,
+        file_id: FileID,
+        event_queue: &mut EventQueue<EguiApp>,
+    ) {
         ui.horizontal(|ui| {
             let label = ui.label("Alias: ");
             if ui.small_button("shorten").clicked() {
@@ -362,19 +370,21 @@ impl File {
         };
 
         ui.separator();
+        let mut scaling_changed = false;
         ui.label("X-Offset: ");
         let dragv = egui::DragValue::new(&mut self.properties.xoffset);
-        ui.add(dragv);
+        scaling_changed = scaling_changed || ui.add(dragv).changed();
         ui.label("Y-Offset: ");
         let dragv = egui::DragValue::new(&mut self.properties.yoffset);
-        ui.add(dragv);
+        scaling_changed = scaling_changed || ui.add(dragv).changed();
         ui.label("Y-Scale: ");
         let dragv = egui::DragValue::new(&mut self.properties.yscale);
-        ui.add(dragv);
+        scaling_changed = scaling_changed || ui.add(dragv).changed();
+        if scaling_changed {
+            event_queue.queue_event(Box::new(RefreshCache(file_id)));
+        }
         if ui.button("Reset offset/scaling").clicked() {
-            self.properties.xoffset = 0.0;
-            self.properties.yoffset = 0.0;
-            self.properties.yscale = 1.0;
+            event_queue.queue_event(Box::new(ResetScaling(file_id)));
         }
 
         ui.separator();

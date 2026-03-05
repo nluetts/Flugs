@@ -44,13 +44,12 @@ impl super::Plotter {
                 match self.mode {
                     // In display mode, we show the file properties menu.
                     super::PlotterMode::Display => {
-                        if let Some(file) = self
-                            .selected_fid
-                            .and_then(|fid| file_handler.registry.get_mut(&fid))
-                        {
-                            plot_ui
-                                .response()
-                                .context_menu(|ui| file.render_property_settings(ui));
+                        if let Some((fid, file)) = self.selected_fid.and_then(|fid| {
+                            file_handler.registry.get_mut(&fid).map(|file| (fid, file))
+                        }) {
+                            plot_ui.response().context_menu(|ui| {
+                                file.render_property_settings(ui, fid, event_queue)
+                            });
                         } else {
                             plot_ui
                                 .response()
@@ -291,6 +290,7 @@ impl super::Plotter {
                     file.properties.xoffset = 0.0;
                     file.properties.yoffset = 0.0;
                     file.properties.yscale = 1.0;
+                    file.refresh_cache();
                 };
             }
         }

@@ -158,6 +158,12 @@ pub struct ManipulateFile {
     modifiers: egui::Modifiers,
 }
 
+/// Refresh cache for file
+pub struct RefreshCache(pub FileID);
+
+/// Reset scaling for file
+pub struct ResetScaling(pub FileID);
+
 // ---------------------------------------------------------------------------
 //
 //
@@ -431,13 +437,50 @@ impl AppEvent for ManipulateFile {
             let ymin_0 = (ymin - yoffset_old) / yscale_old;
             let ymin_new = ymin_0 * yscale_new + yoffset_old;
             active_file.properties.yscale = yscale_new;
-            active_file.properties.yoffset -= if ymin < 0.0 {
-                ymin - ymin_new
-            } else {
-                ymin_new - ymin
-            };
+            active_file.properties.yoffset -= ymin_new - ymin;
         }
         active_file.refresh_cache();
         Ok(EventState::Finished)
+    }
+}
+
+impl AppEvent for RefreshCache {
+    type App = EguiApp;
+
+    fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
+        match app.file_handler.registry.get_mut(&self.0) {
+            Some(file) => {
+                file.refresh_cache();
+                return Ok(EventState::Finished);
+            }
+            None => {
+                return Err(format!(
+                    "Could not refresh cache of file with ID {:?}, not found.",
+                    self.0
+                ));
+            }
+        }
+    }
+}
+
+impl AppEvent for ResetScaling {
+    type App = EguiApp;
+
+    fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
+        match app.file_handler.registry.get_mut(&self.0) {
+            Some(file) => {
+                file.properties.xoffset = 0.0;
+                file.properties.yoffset = 0.0;
+                file.properties.yscale = 1.0;
+                file.refresh_cache();
+                return Ok(EventState::Finished);
+            }
+            None => {
+                return Err(format!(
+                    "Could not reset scaling for file with ID {:?}, not found.",
+                    self.0
+                ));
+            }
+        }
     }
 }

@@ -6,7 +6,7 @@ use std::{
 use app_core::storage::Storage;
 use serde::{Deserialize, Serialize};
 
-use crate::EguiApp;
+use crate::{EguiApp, app::events::RefreshCache};
 
 use super::{
     DynRequestSender, FileHandler,
@@ -71,6 +71,10 @@ pub fn load_json(app: &mut EguiApp, path: Option<&Path>) -> Result<(), String> {
         app.plotter.apply_bounds(bounds);
     }
     app.file_handler = frontend_storage.into_file_handler(&mut app.request_tx);
+    // Refresh file cache to apply scaling/offsets
+    for fid in app.file_handler.registry.keys() {
+        app.event_queue.queue_event(Box::new(RefreshCache(*fid)));
+    }
     app.request_redraw();
     Ok(())
 }

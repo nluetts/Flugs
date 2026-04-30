@@ -6,6 +6,7 @@ use app_core::{
     frontend::UIParameter,
 };
 use egui_plot::PlotPoint;
+use log::{debug, warn};
 
 use crate::{
     BackendAppState,
@@ -131,7 +132,9 @@ impl File {
     }
 
     pub fn refresh_cache(&mut self) {
+        debug!("Refreshing cache for {:?}", self.file_name());
         let Ok(data) = self.data.value_mut() else {
+            warn!("No cache to act upon yet for {:?}", self.file_name());
             return;
         };
         data.rescale(

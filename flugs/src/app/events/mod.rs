@@ -448,6 +448,15 @@ impl AppEvent for RefreshCache {
     type App = EguiApp;
 
     fn apply(&mut self, app: &mut Self::App) -> Result<EventState, String> {
+        if let None = app
+            .file_handler
+            .registry
+            .get(&self.0)
+            .and_then(|file| file.get_cache())
+        {
+            // We are still waiting on the file to load the data
+            return Ok(EventState::Busy);
+        }
         match app.file_handler.registry.get_mut(&self.0) {
             Some(file) => {
                 file.refresh_cache();

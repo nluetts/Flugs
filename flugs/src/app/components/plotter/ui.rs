@@ -3,7 +3,7 @@ use egui_plot::{Legend, PlotBounds, PlotPoint, PlotPoints};
 
 use crate::app::{
     components::{File, FileHandler, FileID},
-    events::{EventQueue, ManipulateFile},
+    events::{EventQueue, ManipulateFile, RefreshCache},
 };
 
 impl super::Plotter {
@@ -60,7 +60,7 @@ impl super::Plotter {
                     super::PlotterMode::Integrate => {
                         plot_ui
                             .response()
-                            .context_menu(|ui| self.integrate_menu(file_handler, ui));
+                            .context_menu(|ui| self.integrate_menu(file_handler, event_queue, ui));
                     }
                     super::PlotterMode::Annotage => {
                         let resp = plot_ui.response();
@@ -296,7 +296,12 @@ impl super::Plotter {
         }
     }
 
-    pub fn integrate_menu(&mut self, file_handler: &mut FileHandler, ui: &mut egui::Ui) {
+    pub fn integrate_menu(
+        &mut self,
+        file_handler: &mut FileHandler,
+        event_queue: &mut EventQueue<crate::EguiApp>,
+        ui: &mut egui::Ui,
+    ) {
         ui.set_min_width(200.0);
 
         // UI to set integral bounds.
@@ -394,6 +399,8 @@ impl super::Plotter {
                                     file.properties.yoffset =
                                         -(offset - ymin) * file.properties.yscale - ymin;
                                 }
+                                // Trigger refresh of cache if we scale on an integral
+                                event_queue.queue_event(Box::new(RefreshCache(*fid)));
                             }
                         });
                     }
